@@ -1,0 +1,6 @@
+{
+  "name": "Jasa Sedot WC Bekasi - PT Kusuma Gemilang Raya",
+  "description": "Layanan sedot WC, septic tank, saluran mampet, dan limbah STP profesional dan berlegalitas resmi di Kota & Kabupaten Bekasi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
