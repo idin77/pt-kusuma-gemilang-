@@ -36,7 +36,7 @@ export default function AutoRedirectFloatingWidget({
   const waUrl = getOptimizedWhatsAppUrl(currentMessage, device.isMobile);
 
   return (
-    <div className="fixed bottom-24 left-4 z-40 hidden md:block animate-fade-in">
+    <div className="fixed bottom-24 left-6 z-40 hidden md:block animate-fade-in">
       <div className="bg-[#0A192F]/95 backdrop-blur-md text-white rounded-2xl p-3 border border-white/15 shadow-2xl flex items-center gap-3 max-w-md group hover:border-[#00C2CB]/50 transition-all">
         
         {/* Device Icon Indicator */}
