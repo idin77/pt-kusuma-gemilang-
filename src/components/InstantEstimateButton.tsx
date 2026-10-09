@@ -18,7 +18,10 @@ import {
   Factory,
   ChevronRight,
   PhoneCall,
-  Calendar
+  Calendar,
+  Toilet,
+  UtensilsCrossed,
+  Fan
 } from 'lucide-react';
 import { CONTACT_INFO, KOTA_BEKASI, KAB_BEKASI } from '../data/websiteData';
 import { saveLeadToMarketing, LeadData } from '../utils/conversionTracker';
@@ -42,37 +45,53 @@ interface ServiceOption {
   description: string;
   allowManifest: boolean;
   badge?: string;
+  icon: React.ComponentType<{ className?: string }>;
 }
 
 const SERVICE_OPTIONS: ServiceOption[] = [
   {
     id: 'sedot_wc',
-    title: 'Sedot WC / Septic Tank Penuh',
+    title: 'Limbah Black Water (Tinja)',
     category: 'Black Water',
-    baseRate: 500000,
+    baseRate: 600000,
     rateUnit: 'per m³',
-    description: 'Pengurasan septic tank sampai tuntas, bersih tanpa bau menyengat.',
+    description: 'Sedot WC & septic tank hunian/gedung sampai bersih tuntas tanpa bau.',
     allowManifest: true,
-    badge: 'Paling Populer'
+    badge: 'Paling Populer',
+    icon: Toilet
   },
   {
     id: 'sedot_lemak',
-    title: 'Sedot Grease Trap / Lemak Dapur',
+    title: 'Limbah Grey Water (Lumpur, Lemak)',
     category: 'Grey Water',
-    baseRate: 900000,
+    baseRate: 1000000,
     rateUnit: 'per m³',
-    description: 'Pembersihan endapan minyak & lemak untuk resto, kafe, dan katering.',
-    allowManifest: true
+    description: 'Pembersihan endapan minyak & lemak grease trap resto, STP & limbah cair.',
+    allowManifest: true,
+    badge: 'STP & Lemak',
+    icon: UtensilsCrossed
   },
   {
     id: 'sedot_stp',
-    title: 'Sedot Limbah Cair STP & Pabrik',
+    title: 'Sedot Limbah Cair STP & Pabrik (Grey Water)',
     category: 'Grey Water & Industri',
-    baseRate: 900000,
+    baseRate: 1000000,
     rateUnit: 'per m³',
     description: 'Pengurasan lumpur aktif & limbah instalasi STP ruko, hotel, dan pabrik.',
     allowManifest: true,
-    badge: 'Komersial'
+    badge: 'Komersial',
+    icon: Factory
+  },
+  {
+    id: 'cleaning_blower',
+    title: 'Cleaning / Blower Lumpur',
+    category: 'Spesialis Kerak & Lumpur',
+    baseRate: 1000000,
+    rateUnit: 'per m³',
+    description: 'Blower pengencer lumpur beku, kuras endapan lumpur padat & kerak septic tank.',
+    allowManifest: true,
+    badge: 'Spesialis Kerak',
+    icon: Fan
   },
   {
     id: 'pipa_mampet',
@@ -81,17 +100,19 @@ const SERVICE_OPTIONS: ServiceOption[] = [
     baseRate: 450000,
     rateUnit: 'per titik',
     description: 'Penanganan pipa wastafel, floor drain, & kloset tanpa bongkar lantai.',
-    allowManifest: false
+    allowManifest: false,
+    icon: Wrench
   },
   {
     id: 'manifest_iplt',
     title: 'Limbah Resmi + Manifest IPLT DLH',
     category: 'Legalitas IPLT',
-    baseRate: 900000,
+    baseRate: 1000000,
     rateUnit: 'per m³',
     description: 'Termasuk bukti setor limbah resmi ke IPLT Sumur Batu Bekasi.',
     allowManifest: true,
-    badge: 'Resmi & Valid'
+    badge: 'Resmi & Valid',
+    icon: FileText
   }
 ];
 
@@ -549,26 +570,38 @@ Mohon info ketersediaan armada terdekat ke alamat kami. Terima kasih!`;
                     <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                       {SERVICE_OPTIONS.map((srv) => {
                         const isSelected = selectedServiceId === srv.id;
+                        const Icon = srv.icon;
                         return (
                           <div
                             key={srv.id}
                             onClick={() => setSelectedServiceId(srv.id)}
-                            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-start justify-between gap-3 ${
+                            className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
                               isSelected
                                 ? 'border-[#00C2CB] bg-[#E0F7F9]/50 shadow-xs ring-1 ring-[#00C2CB]'
                                 : 'border-slate-200 hover:border-slate-300 bg-white'
                             }`}
                           >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-xs text-[#0A192F]">{srv.title}</span>
-                                {srv.badge && (
-                                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-[#FF6B00] text-white">
-                                    {srv.badge}
-                                  </span>
-                                )}
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                                  isSelected
+                                    ? 'bg-[#00C2CB] text-white shadow-xs'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                <Icon className="w-4 h-4" />
                               </div>
-                              <p className="text-[11px] text-slate-500 mt-0.5">{srv.description}</p>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-xs text-[#0A192F] truncate">{srv.title}</span>
+                                  {srv.badge && (
+                                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase bg-[#FF6B00] text-white shrink-0">
+                                      {srv.badge}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{srv.description}</p>
+                              </div>
                             </div>
                             <div className="text-right shrink-0">
                               <span className="text-xs font-black text-[#008c94] block">

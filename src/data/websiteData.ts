@@ -216,7 +216,7 @@ export const FAQS: FaqItem[] = [
   {
     id: 'harga-biaya-bekasi',
     q: 'Berapa harga sedot WC & limbah di Bekasi?',
-    a: 'Harga layanan kami sangat transparan dihitung per kubik (m³): Limbah Black Water (Tinja / Septic Tank) Rp 500.000/kubik (non manifest), Limbah Grey Water (Lumpur & Lemak) Rp 900.000/kubik (non manifest), dan opsi penambahan Dokumen Manifest Resmi IPLT sebesar Rp 400.000/kubik. Anda dapat langsung menggunakan Kalkulator Estimasi Biaya di atas untuk menghitung total biaya secara instan.',
+    a: 'Harga layanan kami sangat transparan dihitung per kubik (m³): Limbah Black Water (Tinja) Rp 600.000/kubik (non manifest) & Rp 1.000.000/kubik (manifest), Limbah Grey Water (Lumpur & Lemak) Rp 1.000.000/kubik (non manifest) & Rp 1.400.000/kubik (manifest), serta Cleaning / Blower Lumpur Rp 1.000.000/kubik (non manifest) & Rp 1.400.000/kubik (manifest). Seluruh opsi manifest disertai dokumen resmi IPLT DLH. Anda dapat langsung menggunakan Kalkulator Estimasi Biaya & Booking Cepat di atas untuk menghitung total biaya secara instan.',
     iconName: 'BadgeDollarSign',
     category: 'Harga & Biaya',
     badge: 'Official',

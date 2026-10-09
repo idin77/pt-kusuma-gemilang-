@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { CONTACT_INFO } from '../data/websiteData';
 import { trackConversion } from '../utils/conversionTracker';
+import { executeAutoRedirect, updateActiveContext } from '../utils/whatsappRedirect';
 
 export interface SectorDetail {
   id: string;
@@ -118,13 +119,15 @@ export default function SpecialistSectors() {
   const selectedSector = SECTORS.find(s => s.key === activeTab) || SECTORS[0];
 
   const handleConsultation = (sector: SectorDetail) => {
-    trackConversion('whatsapp_click', 'specialist_sector_inquiry', {
-      sectorKey: sector.key,
-      sectorTitle: sector.title
-    });
+    const sectorCtx = {
+      sectionId: 'sektor-spesialis',
+      serviceTitle: sector.title,
+      customNotes: sector.tagline,
+      urgency: 'hari_ini' as const
+    };
 
-    const url = `${CONTACT_INFO.whatsappUrl}?text=${encodeURIComponent(sector.waPrompt)}`;
-    window.open(url, '_blank');
+    updateActiveContext(sectorCtx);
+    executeAutoRedirect(sectorCtx, `specialist_sector_${sector.key}`);
   };
 
   return (

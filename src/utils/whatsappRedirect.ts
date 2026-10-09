@@ -27,6 +27,125 @@ export interface SectionContext {
   specificInquiry: string;
 }
 
+export interface WhatsAppContext {
+  sectionId?: string;
+  serviceId?: string;
+  serviceTitle?: string;
+  sectorCategory?: string;
+  district?: string;
+  pricingDetails?: {
+    wasteType?: string;
+    volume?: number;
+    withManifest?: boolean;
+    ratePerCubic?: number;
+    totalPrice?: number;
+  };
+  faqQuestion?: string;
+  urgency?: 'darurat' | 'hari_ini' | 'terjadwal' | 'tanya_biaya';
+  customNotes?: string;
+  source?: string;
+}
+
+export const SERVICE_CONTEXT_TEMPLATES: Record<string, {
+  title: string;
+  category: string;
+  inquiry: string;
+  equipment: string;
+}> = {
+  'sedot-wc': {
+    title: 'Sedot WC / Septic Tank (Black Water)',
+    category: 'Toilet & Septic Tank',
+    inquiry: 'Kloset/septic tank kami sedang penuh atau meluap dan membutuhkan penyedotan vakum tuntas bergaransi tanpa bau.',
+    equipment: 'Truk Tangki Vakum Modern & Selang Panjang'
+  },
+  'saluran-mampet': {
+    title: 'Pelancaran Saluran Mampet (Tanpa Bongkar)',
+    category: 'Pipa Tersumbat',
+    inquiry: 'Pipa pembuangan air/wastafel/kamar mandi kami tersumbat kotoran/lemak dan butuh penanganan mesin spiral tanpa bongkar lantai.',
+    equipment: 'Mesin Rigid Spiral & Jetting Pressure'
+  },
+  'limbah-stp': {
+    title: 'Sedot Limbah STP & Industri (Grey Water)',
+    category: 'STP Komersial & Pabrik',
+    inquiry: 'Kami membutuhkan penyedotan limbah cair STP pabrik/ruko komersial dengan armada tangki resmi & opsi dokumen manifest IPLT DLH.',
+    equipment: 'Truk Tangki Vakum Industri & Pompa Submersible'
+  },
+  'pembuatan-septic-tank': {
+    title: 'Pembuatan & Renovasi Septic Tank',
+    category: 'Konstruksi Sanitasi',
+    inquiry: 'Kami membutuhkan jasa pembuatan septic tank baru resapan SNI / biofilter modern atau renovasi tangki yang rembes/bocor.',
+    equipment: 'Bahan SNI & Ahli Konstruksi Sanitasi'
+  },
+  'sedot-lemak': {
+    title: 'Sedot Grease Trap / Lemak Dapur Resto',
+    category: 'Restoran & Kuliner',
+    inquiry: 'Bak kontrol grease trap resto kami penuh lemak mengeras dan butuh kuras rutin agar saluran pembuangan lancar.',
+    equipment: 'Tangki Vakum & Pembersih Lemak Khusus'
+  },
+  'cleaning-blower': {
+    title: 'Cleaning / Blower Lumpur Beku',
+    category: 'Spesialis Kerak Keras',
+    inquiry: 'Septic tank kami mengalami sedimentasi lumpur padat & kerak keras yang membeku, butuh blower pengencer lumpur spesialis.',
+    equipment: 'Mesin Blower Pengencer & Vakum Heavy-Duty'
+  }
+};
+
+export const SECTOR_CONTEXT_TEMPLATES: Record<string, {
+  title: string;
+  inquiry: string;
+}> = {
+  'Rumah Tinggal': {
+    title: 'Sektor Hunian / Rumah Tinggal',
+    inquiry: 'Penanganan septic tank atau WC mampet rumah tinggal dengan akses selang fleksibel (bisa masuk gang) dan pengerjaan rapi bersih.'
+  },
+  'Perkantoran': {
+    title: 'Sektor Gedung Perkantoran',
+    inquiry: 'Perawatan berkala toilet dan sistem sanitasi gedung kantor agar tidak mengganggu aktivitas kerja karyawan.'
+  },
+  'Perusahaan & Industri': {
+    title: 'Sektor Pabrik & Kawasan Industri',
+    inquiry: 'Pengangkutan limbah cair industri, SOP K3 lengkap, APD teknisi, serta penerbitan Dokumen Manifest IPLT dan faktur pajak SPPKP.'
+  },
+  'Usaha & Komersial': {
+    title: 'Sektor Usaha, Resto, Kafe & Hotel',
+    inquiry: 'Pembersihan grease trap lemak restoran dan perawatan pipa pembuangan di luar jam operasional ramai pengunjung.'
+  }
+};
+
+let memoryContext: WhatsAppContext = {
+  sectionId: 'beranda',
+  urgency: 'hari_ini'
+};
+
+export function updateActiveContext(contextUpdates: Partial<WhatsAppContext>): WhatsAppContext {
+  memoryContext = {
+    ...memoryContext,
+    ...contextUpdates
+  };
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.setItem('pkg_wa_context', JSON.stringify(memoryContext));
+    }
+  } catch {
+    // ignore
+  }
+  return memoryContext;
+}
+
+export function getActiveContext(): WhatsAppContext {
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const stored = window.sessionStorage.getItem('pkg_wa_context');
+      if (stored) {
+        memoryContext = { ...memoryContext, ...JSON.parse(stored) };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return memoryContext;
+}
+
 export const SECTION_CONTEXTS: Record<string, SectionContext> = {
   beranda: {
     id: 'beranda',
@@ -60,9 +179,9 @@ export const SECTION_CONTEXTS: Record<string, SectionContext> = {
   },
   harga: {
     id: 'harga',
-    name: 'Kalkulator Estimasi Biaya & Manifest',
+    name: 'Kalkulator Estimasi Biaya & Booking Cepat',
     badge: 'Transparan & Resmi',
-    specificInquiry: 'Saya sedang mencoba Kalkulator Estimasi Biaya (Black Water Rp 500rb/m³, Grey Water Rp 900rb/m³, atau Manifest IPLT Rp 400rb/m³).'
+    specificInquiry: 'Saya sedang mencoba Kalkulator Estimasi Biaya & Booking Cepat (Black Water Rp 600rb - Rp 1jt/m³, Grey Water Rp 1jt - Rp 1,4jt/m³, Cleaning/Blower Rp 1jt - Rp 1,4jt/m³).'
   },
   dokumentasi: {
     id: 'dokumentasi',
@@ -160,12 +279,19 @@ export function getFriendlyGreeting(): string {
 }
 
 /**
- * Menghasilkan pesan WhatsApp yang sangat personal berdasarkan section dan perangkat
+ * Generator Pesan WhatsApp Cerdas Berbasis Interaksi Nyata
+ * Menghasilkan template pesan terstruktur yang disesuaikan dengan layanan,
+ * bagian website, kalkulator tarif, atau sektor yang sedang dilihat pengguna.
  */
-export function generatePersonalizedWaMessage(
-  sectionId: string = 'beranda',
+export function generateIntelligentWaTemplate(
+  contextParam?: WhatsAppContext,
   deviceOverride?: 'mobile' | 'desktop'
 ): string {
+  const context = {
+    ...getActiveContext(),
+    ...(contextParam || {})
+  };
+
   const device = deviceOverride ? {
     isMobile: deviceOverride === 'mobile',
     deviceType: deviceOverride,
@@ -175,32 +301,87 @@ export function generatePersonalizedWaMessage(
   } : detectDevice();
 
   const greeting = getFriendlyGreeting();
-  const context = SECTION_CONTEXTS[sectionId] || SECTION_CONTEXTS.beranda;
+  const sectionId = context.sectionId || 'beranda';
+  const sectionMeta = SECTION_CONTEXTS[sectionId] || SECTION_CONTEXTS.beranda;
 
-  const deviceContextLine = device.isMobile
-    ? '📱 *[Akses Cepat via Smartphone / Mobile]*'
-    : '💻 *[Akses via Web Desktop / Laptop]*';
+  // Tentukan Judul Layanan / Fokus Kebutuhan
+  let topicTitle = sectionMeta.name;
+  let topicInquiry = sectionMeta.specificInquiry;
 
-  const actionText = device.isMobile
-    ? 'Mohon info ketersediaan armada terdekat saat ini & estimasi waktu tiba ke lokasi saya.'
-    : 'Mohon info ketersediaan armada, jadwal pengerjaan, atau surat penawaran resmi untuk lokasi kami.';
+  if (context.serviceId && SERVICE_CONTEXT_TEMPLATES[context.serviceId]) {
+    const srv = SERVICE_CONTEXT_TEMPLATES[context.serviceId];
+    topicTitle = srv.title;
+    topicInquiry = srv.inquiry;
+  } else if (context.serviceTitle) {
+    topicTitle = context.serviceTitle;
+    topicInquiry = `Saya tertarik dengan layanan ${context.serviceTitle} dan ingin konsultasi penanganan di lokasi saya.`;
+  } else if (context.sectorCategory && SECTOR_CONTEXT_TEMPLATES[context.sectorCategory]) {
+    const sec = SECTOR_CONTEXT_TEMPLATES[context.sectorCategory];
+    topicTitle = sec.title;
+    topicInquiry = sec.inquiry;
+  } else if (context.faqQuestion) {
+    topicTitle = 'Tanya Jawab: ' + context.faqQuestion;
+    topicInquiry = `Saya sedang membaca FAQ seputar: "${context.faqQuestion}" dan ingin konfirmasi lebih detail dengan teknisi.`;
+  }
 
-  const messageLines = [
-    `${greeting} Admin PT Kusuma Gemilang Raya,`,
+  // Label Status Urgensi
+  let urgencyText = '🚨 Butuh Segera / Hari Ini (Darurat)';
+  if (context.urgency === 'terjadwal') {
+    urgencyText = '📅 Ingin Dijadwalkan (Booking Terencana)';
+  } else if (context.urgency === 'tanya_biaya') {
+    urgencyText = '💰 Konsultasi Tarif & Estimasi Biaya Dahulu';
+  } else if (context.urgency === 'hari_ini') {
+    urgencyText = '⚡ Butuh Penanganan Hari Ini';
+  }
+
+  // Detail Tambahan jika dari Kalkulator Estimasi Biaya
+  const pricingLines: string[] = [];
+  const pricing = context.pricingDetails;
+  if (pricing && typeof pricing.totalPrice === 'number') {
+    pricingLines.push(`💵 *Simulasi Estimasi Biaya:* Rp ${pricing.totalPrice.toLocaleString('id-ID')}`);
+    if (pricing.volume) pricingLines.push(`📦 *Estimasi Volume:* ${pricing.volume} Kubik (m³)`);
+    if (pricing.withManifest) pricingLines.push(`📄 *Dokumen:* Dengan Dokumen Manifest Resmi IPLT (+Rp 400.000/m³)`);
+  }
+
+  const locationText = context.district ? `${context.district}, Bekasi` : 'Kota / Kabupaten Bekasi';
+
+  const deviceHeaderTag = device.isMobile
+    ? '📱 *[Akses Cepat WhatsApp Mobile]*'
+    : '💻 *[Akses Web Desktop / Laptop]*';
+
+  const lines = [
+    `${greeting} *Admin PT KUSUMA GEMILANG RAYA*,`,
     '',
-    `Saya sedang membaca website pada bagian:`,
-    `📌 *${context.name}*`,
-    deviceContextLine,
+    `Saya menghubungi Anda melalui website resmi (*sedotwc-bekasi.com*):`,
+    `📋 *Layanan / Kebutuhan:* ${topicTitle}`,
+    `📍 *Wilayah Target:* ${locationText}`,
+    `⏱️ *Status Urgensi:* ${urgencyText}`,
+    deviceHeaderTag,
     '',
-    `Kebutuhan saya:`,
-    `"${context.specificInquiry}"`,
+    `*Rincian Kebutuhan:*`,
+    `"${topicInquiry}"`,
+    ...(pricingLines.length > 0 ? ['', ...pricingLines] : []),
+    ...(context.customNotes ? ['', `📝 *Catatan Tambahan:* ${context.customNotes}`] : []),
     '',
-    actionText,
+    `👉 *Mohon info:*`,
+    `1. Ketersediaan armada tangki terdekat ke lokasi kami`,
+    `2. Estimasi waktu tiba teknisi`,
+    `3. Konfirmasi biaya & jaminan pengerjaan bergaransi`,
     '',
-    `Terima kasih!`
+    `Terima kasih! Siap diarahkan.`
   ];
 
-  return messageLines.join('\n');
+  return lines.join('\n');
+}
+
+/**
+ * Menghasilkan pesan WhatsApp (backward-compatible)
+ */
+export function generatePersonalizedWaMessage(
+  sectionId: string = 'beranda',
+  deviceOverride?: 'mobile' | 'desktop'
+): string {
+  return generateIntelligentWaTemplate({ sectionId }, deviceOverride);
 }
 
 /**
@@ -228,17 +409,25 @@ export function getOptimizedWhatsAppUrl(
  * Eksekusi Auto-Redirect ke WhatsApp dengan pelacakan analitik
  */
 export function executeAutoRedirect(
-  sectionId: string = 'beranda',
+  sectionOrContext: string | WhatsAppContext = 'beranda',
   source: string = 'auto_redirect_engine',
   openInNewTab: boolean = true
 ): void {
   const device = detectDevice();
-  const message = generatePersonalizedWaMessage(sectionId, device.deviceType);
+  const context: WhatsAppContext = typeof sectionOrContext === 'string'
+    ? { sectionId: sectionOrContext }
+    : sectionOrContext;
+
+  updateActiveContext(context);
+  const message = generateIntelligentWaTemplate(context, device.deviceType);
   const targetUrl = getOptimizedWhatsAppUrl(message, device.isMobile);
 
   // Catat event konversi
   trackConversion('whatsapp_click', source, {
-    sectionId,
+    sectionId: context.sectionId || 'beranda',
+    serviceId: context.serviceId,
+    serviceTitle: context.serviceTitle,
+    district: context.district,
     deviceType: device.deviceType,
     deviceLabel: device.deviceLabel,
     isMobile: device.isMobile

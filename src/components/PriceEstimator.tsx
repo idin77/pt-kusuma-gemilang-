@@ -1,10 +1,101 @@
 import React, { useState } from 'react';
-import { Calculator, Send, CheckCircle2, FileText, Info, ShieldCheck, MapPin } from 'lucide-react';
+import { 
+  Calculator, 
+  Send, 
+  CheckCircle2, 
+  FileText, 
+  Info, 
+  ShieldCheck, 
+  MapPin,
+  Toilet,
+  UtensilsCrossed,
+  Fan
+} from 'lucide-react';
 import { CONTACT_INFO, KOTA_BEKASI, KAB_BEKASI } from '../data/websiteData';
 import { trackConversion } from '../utils/conversionTracker';
 
-type WasteType = 'black_water' | 'grey_water';
+type WasteType = 'black_water' | 'grey_water' | 'cleaning_blower';
 type ManifestType = 'non_manifest' | 'dengan_manifest';
+
+interface ServiceCategory {
+  id: WasteType;
+  title: string;
+  badge: string;
+  desc: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconBgActive: string;
+  iconBgInactive: string;
+  iconColorActive: string;
+  iconColorInactive: string;
+  borderActive: string;
+  bgActive: string;
+  ringActive: string;
+  badgeBg: string;
+  badgeText: string;
+  checkBg: string;
+  nonManifestRate: number;
+  manifestRate: number;
+}
+
+const SERVICE_CATEGORIES: ServiceCategory[] = [
+  {
+    id: 'black_water',
+    title: 'Limbah Black Water (Tinja)',
+    badge: 'Septic Tank & Toilet',
+    desc: 'Sedot WC & septic tank rumah tangga, ruko, & perkantoran',
+    icon: Toilet,
+    iconBgActive: 'bg-[#00C2CB] text-white shadow-md ring-2 ring-[#00C2CB]/30',
+    iconBgInactive: 'bg-cyan-50/80 text-[#008c94] group-hover:bg-cyan-100/90',
+    iconColorActive: 'text-white',
+    iconColorInactive: 'text-[#008c94]',
+    borderActive: 'border-[#00C2CB]',
+    bgActive: 'bg-[#E0F7F9]/40',
+    ringActive: 'ring-2 ring-[#00C2CB]/20',
+    badgeBg: 'bg-[#00C2CB]/20',
+    badgeText: 'text-[#0A192F]',
+    checkBg: 'bg-[#00C2CB]',
+    nonManifestRate: 600000,
+    manifestRate: 1000000,
+  },
+  {
+    id: 'grey_water',
+    title: 'Limbah Grey Water (Lumpur, Lemak)',
+    badge: 'STP & Grease Trap',
+    desc: 'Sedot lemak resto, bak kontrol, lumpur limbah cair, & saluran STP',
+    icon: UtensilsCrossed,
+    iconBgActive: 'bg-[#FF6B00] text-white shadow-md ring-2 ring-[#FF6B00]/30',
+    iconBgInactive: 'bg-orange-50/80 text-[#FF6B00] group-hover:bg-orange-100/90',
+    iconColorActive: 'text-white',
+    iconColorInactive: 'text-[#FF6B00]',
+    borderActive: 'border-[#FF6B00]',
+    bgActive: 'bg-[#FF6B00]/5',
+    ringActive: 'ring-2 ring-[#FF6B00]/20',
+    badgeBg: 'bg-[#FF6B00]/20',
+    badgeText: 'text-[#FF6B00]',
+    checkBg: 'bg-[#FF6B00]',
+    nonManifestRate: 1000000,
+    manifestRate: 1400000,
+  },
+  {
+    id: 'cleaning_blower',
+    title: 'Cleaning / Blower Lumpur',
+    badge: 'Spesialis Kerak Keras',
+    desc: 'Blower pengencer lumpur beku, kuras endapan lumpur padat & kerak',
+    icon: Fan,
+    iconBgActive: 'bg-[#008c94] text-white shadow-md ring-2 ring-[#008c94]/30',
+    iconBgInactive: 'bg-teal-50/80 text-[#008c94] group-hover:bg-teal-100/90',
+    iconColorActive: 'text-white',
+    iconColorInactive: 'text-[#008c94]',
+    borderActive: 'border-[#008c94]',
+    bgActive: 'bg-[#00C2CB]/10',
+    ringActive: 'ring-2 ring-[#00C2CB]/20',
+    badgeBg: 'bg-[#008c94]/20',
+    badgeText: 'text-[#008c94]',
+    checkBg: 'bg-[#008c94]',
+    nonManifestRate: 1000000,
+    manifestRate: 1400000,
+  },
+];
 
 export default function PriceEstimator() {
   const [wasteType, setWasteType] = useState<WasteType>('black_water');
@@ -15,11 +106,15 @@ export default function PriceEstimator() {
   const [urgency, setUrgency] = useState<'segera' | 'terjadwal'>('segera');
   const [notes, setNotes] = useState('');
 
-  // Base pricing as requested:
-  // Limbah Black Water (Tinja): 500rb/kubik non manifest
-  // Limbah Grey Water (Lumpur, Lemak): 900rb/kubik non manifest
-  // Tambahan Manifest: +400rb/kubik
-  const baseRatePerCubic = wasteType === 'black_water' ? 500000 : 900000;
+  // Official updated pricing:
+  // 1. Limbah Black Water (Tinja): Rp 600.000/kubik non manifest | Rp 1.000.000/kubik manifest (+Rp 400.000)
+  // 2. Limbah Grey Water (Lumpur, Lemak): Rp 1.000.000/kubik non manifest | Rp 1.400.000/kubik manifest (+Rp 400.000)
+  // 3. Cleaning / Blower Lumpur: Rp 1.000.000/kubik non manifest | Rp 1.400.000/kubik manifest (+Rp 400.000)
+  const baseRatePerCubic = 
+    wasteType === 'black_water' 
+      ? 600000 
+      : (wasteType === 'grey_water' ? 1000000 : 1000000);
+
   const manifestFeePerCubic = manifestOption === 'dengan_manifest' ? 400000 : 0;
   const totalRatePerCubic = baseRatePerCubic + manifestFeePerCubic;
   const totalPrice = totalRatePerCubic * volume;
@@ -27,9 +122,12 @@ export default function PriceEstimator() {
   const handleSendToWhatsApp = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const wasteLabel = wasteType === 'black_water' 
-      ? 'Limbah Black Water (Tinja / Septic Tank)' 
-      : 'Limbah Grey Water (Lumpur, Lemak / STP / Grease Trap)';
+    const wasteLabel = 
+      wasteType === 'black_water' 
+        ? 'Limbah Black Water (Tinja / Septic Tank)' 
+        : wasteType === 'grey_water'
+          ? 'Limbah Grey Water (Lumpur, Lemak / STP / Grease Trap)'
+          : 'Cleaning / Blower Lumpur (Pengenceran Kerak Keras & Lumpur Padat)';
     
     const manifestLabel = manifestOption === 'dengan_manifest' 
       ? 'Dengan Dokumen Manifest Resmi (+Rp 400.000/kubik)' 
@@ -43,7 +141,7 @@ export default function PriceEstimator() {
 `Halo *PT KUSUMA GEMILANG RAYA*,
 Saya ingin order & booking layanan sedot limbah di Bekasi:
 
-📋 *Jenis Limbah:* ${wasteLabel}
+📋 *Jenis Layanan:* ${wasteLabel}
 📦 *Estimasi Volume:* ${volume} Kubik (m³)
 📄 *Dokumen:* ${manifestLabel}
 💰 *Tarif Satuan:* Rp ${totalRatePerCubic.toLocaleString('id-ID')} / kubik
@@ -77,7 +175,7 @@ Mohon konfirmasi ketersediaan armada ke lokasi kami. Terima kasih!`;
           <div>
             <h3 className="text-xl sm:text-2xl font-bold">Kalkulator Estimasi Biaya & Booking Cepat</h3>
             <p className="text-xs sm:text-sm text-cyan-200 mt-0.5">
-              Tarif resmi transparan per kubik untuk Limbah Black Water & Grey Water (Bekasi)
+              Tarif resmi transparan per kubik untuk Limbah Black Water, Grey Water, & Cleaning/Blower Lumpur (Bekasi)
             </p>
           </div>
         </div>
@@ -85,85 +183,99 @@ Mohon konfirmasi ketersediaan armada ke lokasi kami. Terima kasih!`;
 
       <form onSubmit={handleSendToWhatsApp} className="p-6 sm:p-8 space-y-6">
         
-        {/* Step 1: Pilih Jenis Limbah */}
+        {/* Step 1: Pilih Jenis Layanan / Limbah */}
         <div>
-          <label className="block text-sm font-bold text-[#0A192F] mb-3">
-            1. Pilih Jenis Limbah:
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            {/* Black Water Option */}
-            <button
-              type="button"
-              onClick={() => setWasteType('black_water')}
-              className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer relative ${
-                wasteType === 'black_water'
-                  ? 'border-[#00C2CB] bg-[#E0F7F9]/40 shadow-sm'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase bg-[#00C2CB]/20 text-[#0A192F] mb-1.5">
-                    Septic Tank & Toilet
-                  </span>
-                  <h4 className="font-extrabold text-base text-[#0A192F]">
-                    Limbah Black Water (Tinja)
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Sedot WC, pengurasan septic tank rumah tangga, ruko, & kantor
-                  </p>
-                </div>
-                {wasteType === 'black_water' && (
-                  <span className="w-5 h-5 rounded-full bg-[#00C2CB] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    ✓
-                  </span>
-                )}
-              </div>
-              <div className="mt-3 pt-3 border-t border-slate-200/80 flex items-baseline justify-between">
-                <span className="text-xs text-slate-500">Tarif Non Manifest:</span>
-                <span className="text-base font-black text-[#0A192F]">
-                  Rp 500.000<span className="text-xs font-semibold text-slate-500">/kubik</span>
-                </span>
-              </div>
-            </button>
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-bold text-[#0A192F] flex items-center gap-2">
+              <span>1. Pilih Jenis Limbah & Layanan:</span>
+            </label>
+            <span className="text-[11px] text-slate-500 font-semibold hidden sm:inline">
+              Ikon berbeda untuk identifikasi visual cepat
+            </span>
+          </div>
 
-            {/* Grey Water Option */}
-            <button
-              type="button"
-              onClick={() => setWasteType('grey_water')}
-              className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer relative ${
-                wasteType === 'grey_water'
-                  ? 'border-[#FF6B00] bg-[#FF6B00]/5 shadow-sm'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase bg-[#FF6B00]/20 text-[#FF6B00] mb-1.5">
-                    STP & Grease Trap
-                  </span>
-                  <h4 className="font-extrabold text-base text-[#0A192F]">
-                    Limbah Grey Water (Lumpur, Lemak)
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Sedot limbah dapur resto, bak lemak, lumpur limbah, saluran STP
-                  </p>
-                </div>
-                {wasteType === 'grey_water' && (
-                  <span className="w-5 h-5 rounded-full bg-[#FF6B00] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                    ✓
-                  </span>
-                )}
-              </div>
-              <div className="mt-3 pt-3 border-t border-slate-200/80 flex items-baseline justify-between">
-                <span className="text-xs text-slate-500">Tarif Non Manifest:</span>
-                <span className="text-base font-black text-[#FF6B00]">
-                  Rp 900.000<span className="text-xs font-semibold text-slate-500">/kubik</span>
-                </span>
-              </div>
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {SERVICE_CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              const isSelected = wasteType === cat.id;
 
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setWasteType(cat.id)}
+                  className={`group p-4 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer relative flex flex-col justify-between ${
+                    isSelected
+                      ? `${cat.borderActive} ${cat.bgActive} shadow-sm ${cat.ringActive}`
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs'
+                  }`}
+                >
+                  <div>
+                    {/* Header: Distinct Lucide Icon + Badge + Selection Check */}
+                    <div className="flex items-start justify-between gap-2.5 mb-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-200 ${
+                            isSelected ? cat.iconBgActive : cat.iconBgInactive
+                          }`}
+                        >
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <span
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wide ${cat.badgeBg} ${cat.badgeText}`}
+                        >
+                          {cat.badge}
+                        </span>
+                      </div>
+
+                      {isSelected ? (
+                        <span
+                          className={`w-6 h-6 rounded-full ${cat.checkBg} text-white flex items-center justify-center text-xs font-black shrink-0 shadow-xs`}
+                        >
+                          ✓
+                        </span>
+                      ) : (
+                        <span className="w-5 h-5 rounded-full border border-slate-200 bg-slate-50 group-hover:border-slate-300 shrink-0" />
+                      )}
+                    </div>
+
+                    {/* Title & Description */}
+                    <h4 className="font-extrabold text-base text-[#0A192F] group-hover:text-[#00C2CB] transition-colors leading-snug">
+                      {cat.title}
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                      {cat.desc}
+                    </p>
+                  </div>
+
+                  {/* Pricing Breakdown Footer */}
+                  <div className="mt-4 pt-3 border-t border-slate-200/80 space-y-1">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-slate-500 font-medium">Non Manifest:</span>
+                      <span
+                        className={`text-sm font-black ${
+                          cat.id === 'black_water'
+                            ? 'text-[#0A192F]'
+                            : cat.id === 'grey_water'
+                            ? 'text-[#FF6B00]'
+                            : 'text-[#008c94]'
+                        }`}
+                      >
+                        Rp {cat.nonManifestRate.toLocaleString('id-ID')}
+                        <span className="text-[11px] font-semibold text-slate-500">/m³</span>
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between text-emerald-700">
+                      <span className="text-[11px] font-medium">Dengan Manifest:</span>
+                      <span className="text-sm font-black">
+                        Rp {cat.manifestRate.toLocaleString('id-ID')}
+                        <span className="text-[11px] font-semibold text-slate-500">/m³</span>
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -373,9 +485,21 @@ Mohon konfirmasi ketersediaan armada ke lokasi kami. Terima kasih!`;
                 <span>Rincian Perhitungan Biaya Transparan</span>
               </div>
               
-              <div className="text-sm text-slate-300 space-y-1">
-                <p>
-                  • Jenis: <strong className="text-white">{wasteType === 'black_water' ? 'Limbah Black Water (Tinja)' : 'Limbah Grey Water (Lumpur, Lemak)'}</strong>
+              <div className="text-sm text-slate-300 space-y-1.5">
+                <p className="flex items-center gap-2 flex-wrap">
+                  <span>• Jenis Layanan:</span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-white/10 text-white font-bold text-xs sm:text-sm">
+                    {wasteType === 'black_water' && <Toilet className="w-4 h-4 text-[#00C2CB]" />}
+                    {wasteType === 'grey_water' && <UtensilsCrossed className="w-4 h-4 text-[#FF6B00]" />}
+                    {wasteType === 'cleaning_blower' && <Fan className="w-4 h-4 text-cyan-300" />}
+                    <span>
+                      {wasteType === 'black_water' 
+                        ? 'Limbah Black Water (Tinja)' 
+                        : wasteType === 'grey_water' 
+                          ? 'Limbah Grey Water (Lumpur, Lemak)' 
+                          : 'Cleaning / Blower Lumpur'}
+                    </span>
+                  </span>
                 </p>
                 <p>
                   • Tarif Dasar: <strong className="text-white">Rp {baseRatePerCubic.toLocaleString('id-ID')}</strong> / kubik (non manifest)

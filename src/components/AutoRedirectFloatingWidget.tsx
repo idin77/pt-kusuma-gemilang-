@@ -10,29 +10,41 @@ import {
 } from 'lucide-react';
 import { 
   DeviceInfo, 
+  WhatsAppContext,
   SECTION_CONTEXTS,
-  generatePersonalizedWaMessage,
+  SERVICE_CONTEXT_TEMPLATES,
+  generateIntelligentWaTemplate,
   getOptimizedWhatsAppUrl,
-  executeAutoRedirect
+  executeAutoRedirect,
+  getActiveContext
 } from '../utils/whatsappRedirect';
 
 interface AutoRedirectFloatingWidgetProps {
   device: DeviceInfo;
   activeSectionId: string;
+  activeContext?: WhatsAppContext;
   onOpenModal: () => void;
 }
 
 export default function AutoRedirectFloatingWidget({
   device,
   activeSectionId,
+  activeContext,
   onOpenModal
 }: AutoRedirectFloatingWidgetProps) {
   const [isDismissed, setIsDismissed] = useState(false);
 
   if (isDismissed) return null;
 
+  const currentCtx: WhatsAppContext = {
+    ...getActiveContext(),
+    sectionId: activeSectionId,
+    ...(activeContext || {})
+  };
+
   const context = SECTION_CONTEXTS[activeSectionId] || SECTION_CONTEXTS.beranda;
-  const currentMessage = generatePersonalizedWaMessage(activeSectionId, device.deviceType);
+  const currentTitle = currentCtx.serviceTitle || (currentCtx.serviceId && SERVICE_CONTEXT_TEMPLATES[currentCtx.serviceId]?.title) || context.name;
+  const currentMessage = generateIntelligentWaTemplate(currentCtx, device.deviceType);
   const waUrl = getOptimizedWhatsAppUrl(currentMessage, device.isMobile);
 
   return (
@@ -66,7 +78,7 @@ export default function AutoRedirectFloatingWidget({
 
           <p className="text-xs font-bold text-slate-100 truncate flex items-center gap-1">
             <Layers className="w-3 h-3 text-[#FF6B00] shrink-0" />
-            <span className="truncate">Topik: {context.name}</span>
+            <span className="truncate">Fokus: {currentTitle}</span>
           </p>
         </div>
 
@@ -76,7 +88,7 @@ export default function AutoRedirectFloatingWidget({
             href={waUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => executeAutoRedirect(activeSectionId, 'floating_widget_direct_wa')}
+            onClick={() => executeAutoRedirect(currentCtx, 'floating_widget_direct_wa')}
             className="px-3 py-1.5 rounded-xl bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white text-[11px] font-extrabold flex items-center gap-1.5 shadow transition-all cursor-pointer"
             title="Kirim pesan terpersonalisasi langsung ke WhatsApp"
           >

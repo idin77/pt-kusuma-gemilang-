@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Search, MapPin, CheckCircle, Navigation } from 'lucide-react';
 import { KOTA_BEKASI, KAB_BEKASI, CONTACT_INFO } from '../data/websiteData';
 import { trackConversion } from '../utils/conversionTracker';
+import { executeAutoRedirect, updateActiveContext } from '../utils/whatsappRedirect';
 
 export default function AreaChecker() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,12 +23,11 @@ export default function AreaChecker() {
   const isMatched = filteredKota.length > 0 || filteredKab.length > 0;
 
   const handleOrderArea = (areaName: string) => {
-    trackConversion('whatsapp_click', 'area_checker_order', { areaName });
-
-    const text = encodeURIComponent(
-      `Halo PT Kusuma Gemilang Raya, saya butuh jasa sedot WC di wilayah *${areaName}, Bekasi*. Apakah armada bisa meluncur hari ini?`
+    updateActiveContext({ sectionId: 'area', district: areaName, urgency: 'hari_ini' });
+    executeAutoRedirect(
+      { sectionId: 'area', district: areaName, urgency: 'hari_ini' },
+      'area_checker_order'
     );
-    window.open(`${CONTACT_INFO.whatsappUrl}?text=${text}`, '_blank');
   };
 
   return (

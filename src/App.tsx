@@ -32,7 +32,8 @@ import {
   Search,
   Share2,
   Link2,
-  Copy
+  Copy,
+  Printer
 } from 'lucide-react';
 import { 
   CONTACT_INFO, 
@@ -41,6 +42,7 @@ import {
   SOLUTIONS, 
   PROCESS_STEPS, 
   FAQS, 
+  FaqItem,
   ServiceItem 
 } from './data/websiteData';
 import ServiceModal from './components/ServiceModal';
@@ -53,6 +55,8 @@ import SpecialistSectors from './components/SpecialistSectors';
 import IpltManifestSection from './components/IpltManifestSection';
 import SanitationPartnersBanner from './components/SanitationPartnersBanner';
 import MarketingAnalyticsModal from './components/MarketingAnalyticsModal';
+import PrintFaqModal from './components/PrintFaqModal';
+import FaqSocialShare from './components/FaqSocialShare';
 import AutoRedirectModal from './components/AutoRedirectModal';
 import AutoRedirectFloatingWidget from './components/AutoRedirectFloatingWidget';
 import InstantEstimateButton from './components/InstantEstimateButton';
@@ -60,10 +64,13 @@ import { initConversionTracking } from './utils/conversionTracker';
 import { 
   detectDevice, 
   DeviceInfo, 
+  WhatsAppContext,
+  generateIntelligentWaTemplate,
   generatePersonalizedWaMessage, 
   getOptimizedWhatsAppUrl, 
   SECTION_CONTEXTS,
-  executeAutoRedirect 
+  executeAutoRedirect,
+  updateActiveContext 
 } from './utils/whatsappRedirect';
 
 export default function App() {
@@ -76,8 +83,43 @@ export default function App() {
   const [showMarketingModal, setShowMarketingModal] = useState(false);
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo>(detectDevice());
   const [activeSection, setActiveSection] = useState<string>('beranda');
+  const [interactionContext, setInteractionContext] = useState<WhatsAppContext>({
+    sectionId: 'beranda',
+    urgency: 'hari_ini',
+    district: 'Bekasi Barat'
+  });
   const [showAutoRedirectModal, setShowAutoRedirectModal] = useState<boolean>(false);
   const [autoCountdown, setAutoCountdown] = useState<boolean>(false);
+  const [showPrintFaqModal, setShowPrintFaqModal] = useState<boolean>(false);
+  const [copiedFaqId, setCopiedFaqId] = useState<string | null>(null);
+
+  // Deep linking: Dengarkan perubahan hash URL untuk membuka dan scroll ke FAQ tertentu (#faq-harga-biaya-bekasi atau #faq-1)
+  useEffect(() => {
+    const handleFaqAnchorFromHash = () => {
+      if (typeof window === 'undefined') return;
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#faq-')) {
+        const rawId = hash.replace('#faq-', '').toLowerCase().trim();
+        const found = FAQS.find((item, idx) => 
+          (item.id && item.id.toLowerCase() === rawId) ||
+          String(idx + 1) === rawId
+        );
+        if (found) {
+          setActiveFaq(found.q);
+          setTimeout(() => {
+            const targetEl = document.getElementById(hash.substring(1));
+            if (targetEl) {
+              targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 300);
+        }
+      }
+    };
+
+    handleFaqAnchorFromHash();
+    window.addEventListener('hashchange', handleFaqAnchorFromHash);
+    return () => window.removeEventListener('hashchange', handleFaqAnchorFromHash);
+  }, []);
 
   useEffect(() => {
     // Inisialisasi pelacakan konversi global
@@ -117,6 +159,8 @@ export default function App() {
           const id = entry.target.getAttribute('id');
           if (id && sectionIds.includes(id)) {
             setActiveSection(id);
+            updateActiveContext({ sectionId: id });
+            setInteractionContext(prev => ({ ...prev, sectionId: id }));
           }
         }
       });
@@ -168,6 +212,39 @@ export default function App() {
     setActiveFaq(activeFaq === questionText ? null : questionText);
   };
 
+  // Salin URL dengan anchor spesifik (#faq-id) langsung ke clipboard
+  const handleCopyFaqLink = (e: React.MouseEvent, faq: FaqItem, idx: number) => {
+    e.stopPropagation();
+    const anchorSlug = faq.id || String(idx + 1);
+    const anchorId = `faq-${anchorSlug}`;
+    
+    if (typeof window !== 'undefined') {
+      const origin = window.location.origin;
+      const pathname = window.location.pathname;
+      const fullUrl = `${origin}${pathname}#${anchorId}`;
+
+      const doCopy = () => {
+        setCopiedFaqId(anchorId);
+        window.history.pushState(null, '', `#${anchorId}`);
+        if (activeFaq !== faq.q) {
+          setActiveFaq(faq.q);
+        }
+        setTimeout(() => {
+          setCopiedFaqId(prev => (prev === anchorId ? null : prev));
+        }, 2500);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(fullUrl).then(doCopy).catch(() => {
+          // Fallback jika permission browser terbatas
+          prompt('Salin tautan FAQ berikut:', fullUrl);
+        });
+      } else {
+        prompt('Salin tautan FAQ berikut:', fullUrl);
+      }
+    }
+  };
+
   // Helper text highlighter for FAQ search query
   const highlightFaqMatch = (text: string, query: string) => {
     if (!query.trim()) return text;
@@ -215,10 +292,15 @@ export default function App() {
     return matchesSearch && matchesCategory;
   });
 
-  const currentPersonalizedWaMessage = generatePersonalizedWaMessage(activeSection, deviceInfo.deviceType);
+  const effectiveContext: WhatsAppContext = {
+    ...interactionContext,
+    sectionId: activeSection
+  };
+
+  const currentPersonalizedWaMessage = generateIntelligentWaTemplate(effectiveContext, deviceInfo.deviceType);
   const currentWaUrl = getOptimizedWhatsAppUrl(currentPersonalizedWaMessage, deviceInfo.isMobile);
-  const mobileWaUrl = getOptimizedWhatsAppUrl(generatePersonalizedWaMessage(activeSection, 'mobile'), true);
-  const desktopWaUrl = getOptimizedWhatsAppUrl(generatePersonalizedWaMessage(activeSection, 'desktop'), false);
+  const mobileWaUrl = getOptimizedWhatsAppUrl(generateIntelligentWaTemplate(effectiveContext, 'mobile'), true);
+  const desktopWaUrl = getOptimizedWhatsAppUrl(generateIntelligentWaTemplate(effectiveContext, 'desktop'), false);
 
   const defaultWaMessage = encodeURIComponent(
     'Halo PT Kusuma Gemilang Raya, saya ingin konsultasi layanan sedot WC di Bekasi.'
@@ -590,7 +672,12 @@ export default function App() {
 
                 <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
                   <button
-                    onClick={() => setSelectedService(srv)}
+                    onClick={() => {
+                      setSelectedService(srv);
+                      const srvCtx = { sectionId: 'layanan', serviceId: srv.id, serviceTitle: srv.title, urgency: 'hari_ini' as const };
+                      setInteractionContext(srvCtx);
+                      updateActiveContext(srvCtx);
+                    }}
                     className="inline-flex items-center gap-1.5 font-bold text-sm text-[#FF6B00] hover:text-[#E65F00] transition-colors cursor-pointer group/btn"
                   >
                     <span>Lihat Detail</span>
@@ -598,14 +685,28 @@ export default function App() {
                   </button>
 
                   <a
-                    href={`${CONTACT_INFO.whatsappUrl}?text=${encodeURIComponent(
-                      `Halo PT Kusuma Gemilang Raya, saya ingin pesan layanan ${srv.title} di Bekasi.`
-                    )}`}
+                    href={getOptimizedWhatsAppUrl(
+                      generateIntelligentWaTemplate({
+                        sectionId: 'layanan',
+                        serviceId: srv.id,
+                        serviceTitle: srv.title,
+                        urgency: 'hari_ini'
+                      }, deviceInfo.deviceType),
+                      deviceInfo.isMobile
+                    )}
+                    onClick={() => {
+                      const srvCtx = { sectionId: 'layanan', serviceId: srv.id, serviceTitle: srv.title, urgency: 'hari_ini' as const };
+                      setInteractionContext(srvCtx);
+                      updateActiveContext(srvCtx);
+                      executeAutoRedirect(srvCtx, `service_card_${srv.id}`);
+                    }}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs font-bold text-slate-400 hover:text-[#00C2CB] transition-colors"
+                    className="text-xs font-bold text-[#008c94] hover:text-[#00C2CB] transition-colors flex items-center gap-1 cursor-pointer"
+                    title={`Pesan langsung ${srv.title} via pesan cerdas WhatsApp`}
                   >
-                    Pesan WA →
+                    <span>Pesan WA Otomatis</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </a>
                 </div>
               </div>
@@ -717,14 +818,27 @@ export default function App() {
                 </ul>
 
                 <a
-                  href={`${CONTACT_INFO.whatsappUrl}?text=${encodeURIComponent(
-                    `Halo PT Kusuma Gemilang Raya, saya butuh penanganan sanitasi untuk kategori ${sol.category} di Bekasi.`
-                  )}`}
+                  href={getOptimizedWhatsAppUrl(
+                    generateIntelligentWaTemplate({
+                      sectionId: 'sektor-spesialis',
+                      sectorCategory: sol.category,
+                      urgency: 'hari_ini'
+                    }, deviceInfo.deviceType),
+                    deviceInfo.isMobile
+                  )}
+                  onClick={() => {
+                    const solCtx = { sectionId: 'sektor-spesialis', sectorCategory: sol.category, urgency: 'hari_ini' as const };
+                    setInteractionContext(solCtx);
+                    updateActiveContext(solCtx);
+                    executeAutoRedirect(solCtx, `sector_card_${sol.category}`);
+                  }}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-6 block text-xs font-bold text-[#00C2CB] hover:text-[#0A192F] transition-colors"
+                  className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-[#00C2CB] hover:text-[#0A192F] transition-colors"
+                  title={`Konsultasi khusus ${sol.category} dengan template pesan WhatsApp otomatis`}
                 >
-                  Konsultasi {sol.category} →
+                  <span>Konsultasi {sol.category} (WA Otomatis)</span>
+                  <ArrowRight className="w-3 h-3" />
                 </a>
               </div>
             ))}
@@ -771,53 +885,87 @@ export default function App() {
           </div>
 
           {/* Official Rate Cards */}
-          <div className="max-w-4xl mx-auto mb-10 grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="bg-white p-6 rounded-3xl border-2 border-[#00C2CB]/40 shadow-sm relative overflow-hidden">
-              <div className="flex items-center justify-between mb-3">
-                <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-[#00C2CB]/15 text-[#0A192F]">
-                  Toilet & Septic Tank
-                </span>
-                <span className="text-xs font-bold text-slate-400">Standar Perumahan / Gedung</span>
+          <div className="max-w-5xl mx-auto mb-10 grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* 1. Black Water */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-[#00C2CB]/40 shadow-sm relative overflow-hidden flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-[#00C2CB]/15 text-[#0A192F]">
+                    Toilet & Septic Tank
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-400">Hunian & Gedung</span>
+                </div>
+                <h3 className="text-lg font-black text-[#0A192F] mb-1">
+                  Limbah Black Water (Tinja)
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Penyedotan kloset, tinja, & pengurasan septic tank sampai bersih tuntas.
+                </p>
               </div>
-              <h3 className="text-xl font-black text-[#0A192F] mb-1">
-                Limbah Black Water (Tinja)
-              </h3>
-              <p className="text-xs text-slate-500 mb-4">
-                Penyedotan kloset, tinja, & pengurasan septic tank sampai bersih tuntas.
-              </p>
               <div className="space-y-2 pt-3 border-t border-slate-100">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-600">Tarif Non Manifest:</span>
-                  <span className="text-lg font-black text-[#00C2CB]">Rp 500.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                  <span className="text-xs font-bold text-slate-600">Non Manifest:</span>
+                  <span className="text-base font-black text-[#00C2CB]">Rp 600.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-600">Dengan Manifest Resmi (+400rb):</span>
-                  <span className="text-base font-black text-[#0A192F]">Rp 900.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                  <span className="text-xs font-bold text-slate-600">Dengan Manifest:</span>
+                  <span className="text-base font-black text-[#0A192F]">Rp 1.000.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-3xl border-2 border-[#FF6B00]/40 shadow-sm relative overflow-hidden">
-              <div className="flex items-center justify-between mb-3">
-                <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-[#FF6B00]/15 text-[#FF6B00]">
-                  STP & Grease Trap
-                </span>
-                <span className="text-xs font-bold text-slate-400">Komersial & Industri</span>
+            {/* 2. Grey Water */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-[#FF6B00]/40 shadow-sm relative overflow-hidden flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-[#FF6B00]/15 text-[#FF6B00]">
+                    STP & Grease Trap
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-400">Komersial & Resto</span>
+                </div>
+                <h3 className="text-lg font-black text-[#0A192F] mb-1">
+                  Limbah Grey Water (Lumpur, Lemak)
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Penyedotan lemak dapur resto, lumpur limbah cair, & instalasi STP.
+                </p>
               </div>
-              <h3 className="text-xl font-black text-[#0A192F] mb-1">
-                Limbah Grey Water (Lumpur, Lemak)
-              </h3>
-              <p className="text-xs text-slate-500 mb-4">
-                Penyedotan lemak dapur resto, lumpur aktif, & limbah cair instalasi STP.
-              </p>
               <div className="space-y-2 pt-3 border-t border-slate-100">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-600">Tarif Non Manifest:</span>
-                  <span className="text-lg font-black text-[#FF6B00]">Rp 900.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                  <span className="text-xs font-bold text-slate-600">Non Manifest:</span>
+                  <span className="text-base font-black text-[#FF6B00]">Rp 1.000.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-600">Dengan Manifest Resmi (+400rb):</span>
-                  <span className="text-base font-black text-[#0A192F]">Rp 1.300.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                  <span className="text-xs font-bold text-slate-600">Dengan Manifest:</span>
+                  <span className="text-base font-black text-[#0A192F]">Rp 1.400.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Cleaning / Blower Lumpur */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-[#008c94]/40 shadow-sm relative overflow-hidden flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-[#008c94]/15 text-[#008c94]">
+                    Spesialis Kerak Keras
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-400">Endapan & Lumpur</span>
+                </div>
+                <h3 className="text-lg font-black text-[#0A192F] mb-1">
+                  Cleaning / Blower Lumpur
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Blower pengencer lumpur beku, kuras endapan lumpur padat & kerak septic tank.
+                </p>
+              </div>
+              <div className="space-y-2 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-600">Non Manifest:</span>
+                  <span className="text-base font-black text-[#008c94]">Rp 1.000.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-600">Dengan Manifest:</span>
+                  <span className="text-base font-black text-[#0A192F]">Rp 1.400.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
                 </div>
               </div>
             </div>
@@ -961,14 +1109,29 @@ export default function App() {
 
                 <div className="pt-2">
                   <a
-                    href={`${CONTACT_INFO.whatsappUrl}?text=${encodeURIComponent(
-                      'Halo PT Kusuma Gemilang Raya, saya ingin verifikasi legalitas dan order layanan sanitasi di Bekasi.'
-                    )}`}
+                    href={getOptimizedWhatsAppUrl(
+                      generateIntelligentWaTemplate({
+                        sectionId: 'tentang',
+                        customNotes: 'Verifikasi legalitas NIB KBLI 37011, bukti setor IPLT, dan faktur pajak SPPKP',
+                        urgency: 'hari_ini'
+                      }, deviceInfo.deviceType),
+                      deviceInfo.isMobile
+                    )}
+                    onClick={() => {
+                      const legalCtx = {
+                        sectionId: 'tentang',
+                        customNotes: 'Verifikasi legalitas NIB KBLI 37011, bukti setor IPLT, dan faktur pajak SPPKP',
+                        urgency: 'hari_ini' as const
+                      };
+                      setInteractionContext(legalCtx);
+                      updateActiveContext(legalCtx);
+                      executeAutoRedirect(legalCtx, 'legal_section_cta');
+                    }}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-[#FF6B00] hover:bg-[#E65F00] text-white font-bold text-sm shadow-md transition-all"
+                    className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-[#FF6B00] hover:bg-[#E65F00] text-white font-bold text-sm shadow-md transition-all cursor-pointer"
                   >
-                    <FileCheck2 className="w-4 h-4" /> Hubungi Kami Resmi
+                    <FileCheck2 className="w-4 h-4" /> Hubungi Kami Resmi (WA Otomatis)
                   </a>
                 </div>
               </div>
@@ -1023,16 +1186,46 @@ export default function App() {
       {/* FAQ Section with Real-Time Search & Category Filters */}
       <section id="faq" className="py-20 bg-[#F8FAFC]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
+          <div className="text-center mb-8">
             <span className="text-xs font-extrabold text-[#00C2CB] uppercase tracking-widest block mb-2">
               Tanya Jawab
             </span>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-[#0A192F] tracking-tight">
               Pertanyaan yang Sering Diajukan
             </h2>
-            <p className="mt-3 text-base text-slate-600">
+            <p className="mt-3 text-base text-slate-600 max-w-2xl mx-auto">
               Informasi penting seputar layanan sedot WC, limbah STP, dan kepatuhan legalitas di Bekasi.
             </p>
+            
+            {/* Header Action: Print FAQ Button & Social Media Broadcast Icons */}
+            <div className="mt-6 flex flex-col items-center justify-center gap-3.5">
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPrintFaqModal(true)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 hover:text-[#0A192F] text-xs sm:text-sm font-bold border-2 border-slate-200 hover:border-[#00C2CB] shadow-xs transition-all cursor-pointer group hover:shadow-md active:scale-98"
+                  title="Buka pratinjau ramah cetak (A4 / PDF) untuk referensi profesional"
+                >
+                  <Printer className="w-4 h-4 text-[#00C2CB] group-hover:scale-110 transition-transform" />
+                  <span>Cetak Dokumen FAQ (Print / PDF)</span>
+                  <span className="bg-[#00C2CB]/15 text-[#0A192F] font-black text-[11px] px-2 py-0.5 rounded-full">
+                    {filteredFaqs.length} Q&A
+                  </span>
+                </button>
+              </div>
+
+              {/* Social Media Sharing Icons (WhatsApp, Facebook, Twitter) */}
+              <div className="w-full max-w-xl">
+                <div className="bg-white/80 backdrop-blur-xs py-2 px-3 sm:px-4 rounded-2xl border border-slate-200 shadow-2xs">
+                  <FaqSocialShare 
+                    filteredCount={filteredFaqs.length}
+                    totalCount={FAQS.length}
+                    activeCategory={faqCategoryFilter}
+                    searchQuery={faqSearchQuery}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Kolom Input Pencarian FAQ & Filter Kategori */}
@@ -1129,16 +1322,27 @@ export default function App() {
                     </span>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFaqSearchQuery('');
-                    setFaqCategoryFilter('Semua');
-                  }}
-                  className="text-xs font-bold text-[#FF6B00] hover:text-[#E65F00] hover:underline cursor-pointer shrink-0 ml-2"
-                >
-                  Reset Filter
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPrintFaqModal(true)}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#00C2CB] bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs hover:border-slate-300 transition-all cursor-pointer"
+                    title="Cetak daftar FAQ yang sedang difilter"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-[#00C2CB]" />
+                    <span>Cetak ({filteredFaqs.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFaqSearchQuery('');
+                      setFaqCategoryFilter('Semua');
+                    }}
+                    className="text-xs font-bold text-[#FF6B00] hover:text-[#E65F00] hover:underline cursor-pointer shrink-0 ml-1"
+                  >
+                    Reset Filter
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1170,12 +1374,27 @@ export default function App() {
                   Lihat Semua Pertanyaan ({FAQS.length})
                 </button>
                 <a
-                  href={`${CONTACT_INFO.whatsappUrl}?text=${encodeURIComponent(
-                    `Halo PT Kusuma Gemilang Raya, saya mau menanyakan perihal: "${faqSearchQuery || 'layanan sanitasi'}" di Bekasi.`
-                  )}`}
+                  href={getOptimizedWhatsAppUrl(
+                    generateIntelligentWaTemplate({
+                      sectionId: 'faq',
+                      faqQuestion: faqSearchQuery ? `Pencarian: ${faqSearchQuery}` : 'Tanya Jawab Umum Sanitasi',
+                      urgency: 'tanya_biaya'
+                    }, deviceInfo.deviceType),
+                    deviceInfo.isMobile
+                  )}
+                  onClick={() => {
+                    const faqCtx = {
+                      sectionId: 'faq',
+                      faqQuestion: faqSearchQuery ? `Pencarian: ${faqSearchQuery}` : 'Tanya Jawab Umum Sanitasi',
+                      urgency: 'tanya_biaya' as const
+                    };
+                    setInteractionContext(faqCtx);
+                    updateActiveContext(faqCtx);
+                    executeAutoRedirect(faqCtx, 'faq_search_wa_button');
+                  }}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-6 py-2.5 rounded-full bg-[#FF6B00] hover:bg-[#E65F00] text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5"
+                  className="px-6 py-2.5 rounded-full bg-[#FF6B00] hover:bg-[#E65F00] text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>Tanyakan Langsung via WhatsApp</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -1322,11 +1541,13 @@ export default function App() {
                 const isSafety = faq.highlightType === 'safety' || faq.iconName === 'ShieldCheck';
                 const isManifest = faq.category?.includes('Manifest') || faq.iconName === 'FileCheck';
                 const isMaintenance = faq.highlightType === 'maintenance' || faq.category === 'Tips Perawatan';
+                const faqAnchorId = `faq-${faq.id || (idx + 1)}`;
 
                 return (
                   <div
                     key={idx}
-                    className={`bg-white rounded-2xl border transition-all overflow-hidden ${
+                    id={faqAnchorId}
+                    className={`bg-white rounded-2xl border transition-all overflow-hidden scroll-mt-28 ${
                       isOpen 
                         ? isPricing
                           ? 'border-amber-400 shadow-md ring-2 ring-amber-400/20'
@@ -1450,11 +1671,38 @@ export default function App() {
                           </div>
                         </div>
                       </div>
-                      <ChevronDown
-                        className={`w-5 h-5 text-[#00C2CB] shrink-0 mt-1 sm:mt-0 transition-transform duration-300 ${
-                          isOpen ? 'rotate-180' : ''
-                        }`}
-                      />
+
+                      {/* Right Action: Share Link button + Chevron */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopyFaqLink(e, faq, idx)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                            copiedFaqId === faqAnchorId
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300 ring-2 ring-emerald-400/20 shadow-xs'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-[#0A192F] border-slate-200'
+                          }`}
+                          title={`Salin tautan langsung (#${faqAnchorId})`}
+                          aria-label={`Salin tautan pertanyaan: ${faq.q}`}
+                        >
+                          {copiedFaqId === faqAnchorId ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="text-[11px] font-bold text-emerald-700">Tersalin!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Link2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
+                              <span className="text-[11px] hidden sm:inline">Bagikan</span>
+                            </>
+                          )}
+                        </button>
+                        <ChevronDown
+                          className={`w-5 h-5 text-[#00C2CB] shrink-0 transition-transform duration-300 ${
+                            isOpen ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </div>
                     </button>
 
                     {isOpen && (
@@ -1485,6 +1733,33 @@ export default function App() {
                               </span>
                             </div>
                           )}
+
+                          {/* Direct Anchor & Share Link bar */}
+                          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-slate-400 text-[11px]">Tautan Langsung:</span>
+                              <span className="font-mono text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                                #{faqAnchorId}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => handleCopyFaqLink(e, faq, idx)}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-[#00C2CB] hover:text-[#0A192F] cursor-pointer"
+                            >
+                              {copiedFaqId === faqAnchorId ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                  <span className="text-emerald-600">Tautan Berhasil Tersalin!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Salin Tautan Pertanyaan</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1497,14 +1772,29 @@ export default function App() {
           <div className="text-center mt-10">
             <p className="text-sm text-slate-500 mb-3">Punya pertanyaan lain yang belum terjawab?</p>
             <a
-              href={`${CONTACT_INFO.whatsappUrl}?text=${encodeURIComponent(
-                'Halo PT Kusuma Gemilang Raya, saya mau tanya seputar layanan sedot WC di Bekasi.'
-              )}`}
+              href={getOptimizedWhatsAppUrl(
+                generateIntelligentWaTemplate({
+                  sectionId: 'faq',
+                  faqQuestion: 'Pertanyaan lain seputar layanan sanitasi Bekasi',
+                  urgency: 'tanya_biaya'
+                }, deviceInfo.deviceType),
+                deviceInfo.isMobile
+              )}
+              onClick={() => {
+                const faqCtx = {
+                  sectionId: 'faq',
+                  faqQuestion: 'Pertanyaan lain seputar layanan sanitasi Bekasi',
+                  urgency: 'tanya_biaya' as const
+                };
+                setInteractionContext(faqCtx);
+                updateActiveContext(faqCtx);
+                executeAutoRedirect(faqCtx, 'faq_bottom_cs_button');
+              }}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm font-bold text-[#FF6B00] hover:text-[#E65F00] transition-colors"
+              className="inline-flex items-center gap-2 text-sm font-bold text-[#FF6B00] hover:text-[#E65F00] transition-colors cursor-pointer"
             >
-              <span>Chat langsung dengan CS kami via WhatsApp</span>
+              <span>Chat langsung dengan CS kami via WhatsApp (Pesan Otomatis)</span>
               <ArrowRight className="w-4 h-4" />
             </a>
           </div>
@@ -1532,10 +1822,11 @@ export default function App() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a
               href={currentWaUrl}
+              onClick={() => executeAutoRedirect(effectiveContext, 'final_cta_whatsapp')}
               target="_blank"
               rel="noopener noreferrer"
               data-cta-source="final_cta_whatsapp"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-10 py-4 rounded-full bg-[#0A192F] hover:bg-white text-white hover:text-[#0A192F] font-black text-lg transition-all shadow-xl hover:scale-105"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-10 py-4 rounded-full bg-[#0A192F] hover:bg-white text-white hover:text-[#0A192F] font-black text-lg transition-all shadow-xl hover:scale-105 cursor-pointer"
             >
               <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.693.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
@@ -1662,6 +1953,7 @@ export default function App() {
       {/* Desktop Floating WhatsApp Action Button (Left Side) */}
       <a
         href={desktopWaUrl}
+        onClick={() => executeAutoRedirect(effectiveContext, 'floating_desktop_wa_left')}
         target="_blank"
         rel="noopener noreferrer"
         data-cta-source="floating_desktop_wa_left"
@@ -1685,13 +1977,14 @@ export default function App() {
 
         {/* Floating Tooltip pointing right */}
         <span className="absolute left-full ml-3 whitespace-nowrap bg-[#0A192F] text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden lg:block border border-white/10">
-          Chat CS WhatsApp ({SECTION_CONTEXTS[activeSection]?.name || 'Online 24 Jam'})
+          Chat CS WhatsApp ({effectiveContext.serviceTitle || SECTION_CONTEXTS[activeSection]?.name || 'Online 24 Jam'})
         </span>
       </a>
 
       {/* Desktop Floating WhatsApp Action Button (Right Side) */}
       <a
         href={desktopWaUrl}
+        onClick={() => executeAutoRedirect(effectiveContext, 'floating_desktop_wa')}
         target="_blank"
         rel="noopener noreferrer"
         data-cta-source="floating_desktop_wa"
@@ -1704,7 +1997,7 @@ export default function App() {
 
         {/* Floating Tooltip */}
         <span className="absolute right-20 whitespace-nowrap bg-[#0A192F] text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
-          Chat WhatsApp (Pesan Otomatis: {SECTION_CONTEXTS[activeSection]?.name || 'Online 24 Jam'})
+          Chat WhatsApp ({effectiveContext.serviceTitle || SECTION_CONTEXTS[activeSection]?.name || 'Online 24 Jam'})
         </span>
       </a>
 
@@ -1726,7 +2019,7 @@ export default function App() {
             title="Deteksi perangkat & personalisasi pesan WhatsApp"
           >
             <Sparkles className="w-3 h-3 text-[#FF6B00]" />
-            <span>Auto-Redirect ({SECTION_CONTEXTS[activeSection]?.badge || 'Aktif'})</span>
+            <span>Pesan Otomatis ({effectiveContext.serviceTitle ? 'Layanan Terpilih' : SECTION_CONTEXTS[activeSection]?.badge || 'Aktif'})</span>
           </button>
         </div>
 
@@ -1751,6 +2044,7 @@ export default function App() {
           {/* Tombol Chat WA */}
           <a
             href={mobileWaUrl}
+            onClick={() => executeAutoRedirect(effectiveContext, 'mobile_floating_wa')}
             target="_blank"
             rel="noopener noreferrer"
             data-cta-source="mobile_floating_wa"
@@ -1774,12 +2068,20 @@ export default function App() {
       <ServiceModal
         service={selectedService}
         onClose={() => setSelectedService(null)}
+        onCustomizeTemplate={(srv) => {
+          const srvCtx = { sectionId: 'layanan', serviceId: srv.id, serviceTitle: srv.title, urgency: 'hari_ini' as const };
+          setInteractionContext(srvCtx);
+          updateActiveContext(srvCtx);
+          setAutoCountdown(false);
+          setShowAutoRedirectModal(true);
+        }}
       />
 
       {/* Auto-Redirect Floating Widget for Desktop */}
       <AutoRedirectFloatingWidget
         device={deviceInfo}
         activeSectionId={activeSection}
+        activeContext={effectiveContext}
         onOpenModal={() => {
           setAutoCountdown(false);
           setShowAutoRedirectModal(true);
@@ -1791,6 +2093,7 @@ export default function App() {
         isOpen={showAutoRedirectModal}
         onClose={() => setShowAutoRedirectModal(false)}
         activeSectionId={activeSection}
+        initialContext={effectiveContext}
         autoStartCountdown={autoCountdown}
       />
 
@@ -1798,6 +2101,16 @@ export default function App() {
       <MarketingAnalyticsModal
         isOpen={showMarketingModal}
         onClose={() => setShowMarketingModal(false)}
+      />
+
+      {/* Print FAQ Professional Reference Document Modal */}
+      <PrintFaqModal
+        isOpen={showPrintFaqModal}
+        onClose={() => setShowPrintFaqModal(false)}
+        faqs={filteredFaqs}
+        activeCategory={faqCategoryFilter}
+        searchQuery={faqSearchQuery}
+        totalFaqsCount={FAQS.length}
       />
     </div>
   );

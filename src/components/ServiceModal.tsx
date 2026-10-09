@@ -1,18 +1,38 @@
-import { X, CheckCircle, PhoneCall, ShieldCheck, Wrench } from 'lucide-react';
+import React from 'react';
+import { X, CheckCircle, PhoneCall, ShieldCheck, Wrench, Sparkles } from 'lucide-react';
 import { ServiceItem, CONTACT_INFO } from '../data/websiteData';
+import { 
+  generateIntelligentWaTemplate, 
+  getOptimizedWhatsAppUrl, 
+  executeAutoRedirect,
+  updateActiveContext,
+  detectDevice
+} from '../utils/whatsappRedirect';
 
 interface ServiceModalProps {
   service: ServiceItem | null;
   onClose: () => void;
+  onCustomizeTemplate?: (service: ServiceItem) => void;
 }
 
-export default function ServiceModal({ service, onClose }: ServiceModalProps) {
+export default function ServiceModal({ service, onClose, onCustomizeTemplate }: ServiceModalProps) {
   if (!service) return null;
 
-  const waMessage = encodeURIComponent(
-    `Halo PT Kusuma Gemilang Raya, saya ingin konsultasi dan pesan layanan *${service.title}* di area Bekasi. Mohon info ketersediaan armada dan estimasi biaya.`
-  );
-  const waUrl = `${CONTACT_INFO.whatsappUrl}?text=${waMessage}`;
+  const device = detectDevice();
+  const serviceContext = {
+    sectionId: 'layanan',
+    serviceId: service.id,
+    serviceTitle: service.title,
+    urgency: 'hari_ini' as const
+  };
+
+  const intelligentMessage = generateIntelligentWaTemplate(serviceContext, device.deviceType);
+  const waUrl = getOptimizedWhatsAppUrl(intelligentMessage, device.isMobile);
+
+  const handleOrderWhatsApp = (e: React.MouseEvent) => {
+    updateActiveContext(serviceContext);
+    executeAutoRedirect(serviceContext, `service_modal_${service.id}`);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
@@ -75,7 +95,21 @@ export default function ServiceModal({ service, onClose }: ServiceModalProps) {
           <div className="text-xs text-slate-500">
             ⚡ Siaga 24 Jam • Respon WhatsApp Cepat
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {onCustomizeTemplate && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onCustomizeTemplate(service);
+                }}
+                className="px-3.5 py-2.5 rounded-full border border-[#00C2CB]/40 bg-[#E0F7F9] hover:bg-[#cbf1f3] text-[#008c94] font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Buka pratinjau template pesan WhatsApp"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#FF6B00]" />
+                <span>Opsi Template</span>
+              </button>
+            )}
             <button
               onClick={onClose}
               className="px-4 py-2.5 rounded-full text-slate-600 hover:bg-slate-200 font-semibold text-sm transition-colors cursor-pointer"
@@ -84,13 +118,14 @@ export default function ServiceModal({ service, onClose }: ServiceModalProps) {
             </button>
             <a
               href={waUrl}
+              onClick={handleOrderWhatsApp}
               target="_blank"
               rel="noopener noreferrer"
               data-cta-source="service_detail_modal"
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#FF6B00] hover:bg-[#E65F00] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white font-black text-sm shadow-md hover:shadow-lg transition-all cursor-pointer"
             >
               <PhoneCall className="w-4 h-4" />
-              Pesan Layanan via WhatsApp
+              <span>Chat WhatsApp (Otomatis)</span>
             </a>
           </div>
         </div>
