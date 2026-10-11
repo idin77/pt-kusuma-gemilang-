@@ -23,9 +23,17 @@ import {
   ListOrdered,
   Scan,
   ArrowDown,
-  ArrowLeft
+  ArrowLeft,
+  Camera,
+  HelpCircle,
+  FileSpreadsheet,
+  Share2,
+  Mail,
+  Send,
+  Twitter
 } from 'lucide-react';
 import { FaqItem, CONTACT_INFO } from '../data/websiteData';
+import { exportFaqsToCsv } from '../utils/exportCsv';
 
 interface PrintFaqModalProps {
   isOpen: boolean;
@@ -101,6 +109,14 @@ export default function PrintFaqModal({
     })} WIB`;
     const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
     const documentId = `ID: KGR-FAQ-${now.getFullYear()}-${randomSuffix}`;
+    const generatedOn = `${now.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    })}, ${now.toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })} WIB`;
 
     return {
       dateFormatted,
@@ -108,7 +124,8 @@ export default function PrintFaqModal({
       docRef,
       isoTimestamp,
       lastUpdated,
-      documentId
+      documentId,
+      generatedOn
     };
   });
 
@@ -161,6 +178,8 @@ export default function PrintFaqModal({
     const textLines = [
       '==============================================================',
       'PT KUSUMA GEMILANG RAYA - DOKUMEN REFERENSI RESMI FAQ',
+      `Generated on: ${docMeta.generatedOn} (Live Service Snapshot)`,
+      'Status: LEGAL & LICENSED (NIB: 3701100028193 • IPLT Sumur Batu)',
       'Jasa Sedot WC, Pembersihan Saluran & Penanganan Limbah Resmi Bekasi',
       `Tanggal Terbit: ${docMeta.dateFormatted}`,
       `Waktu & Timestamp: ${docMeta.timeFormatted}`,
@@ -199,6 +218,59 @@ export default function PrintFaqModal({
     navigator.clipboard.writeText(textLines.join('\n')).then(() => {
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 2500);
+    });
+  };
+
+  // State to track which FAQ item has its Quick Share menu opened
+  const [activeShareMenuId, setActiveShareMenuId] = useState<string | null>(null);
+  const [copiedShareFaqId, setCopiedShareFaqId] = useState<string | null>(null);
+
+  // Close share popup on click outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.faq-share-container')) {
+        setActiveShareMenuId(null);
+      }
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  const handleShareWhatsApp = (faq: FaqItem, index: number) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://sedotwcbekasi.co.id';
+    const faqAnchor = `${origin}/#faq-${faq.id || (index + 1)}`;
+    const text = `*Tanya Jawab Sanitasi PT Kusuma Gemilang Raya*\n\n*Q:* ${faq.q}\n\n*A:* ${faq.a}\n\nBuka FAQ lengkap: ${faqAnchor}\n\nHotline 24 Jam: ${CONTACT_INFO.phoneDisplay}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+    setActiveShareMenuId(null);
+  };
+
+  const handleShareTwitter = (faq: FaqItem, index: number) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://sedotwcbekasi.co.id';
+    const faqAnchor = `${origin}/#faq-${faq.id || (index + 1)}`;
+    const text = `FAQ Sanitasi PT Kusuma Gemilang Raya:\n"${faq.q}"\n\nPelajari selengkapnya:`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(faqAnchor)}`, '_blank', 'noopener,noreferrer');
+    setActiveShareMenuId(null);
+  };
+
+  const handleShareEmail = (faq: FaqItem, index: number) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://sedotwcbekasi.co.id';
+    const faqAnchor = `${origin}/#faq-${faq.id || (index + 1)}`;
+    const subject = `FAQ Sanitasi: ${faq.q} - PT Kusuma Gemilang Raya`;
+    const body = `Halo,\n\nBerikut ringkasan tanya jawab resmi dari PT Kusuma Gemilang Raya:\n\nPertanyaan:\n${faq.q}\n\nPenjelasan Resmi:\n${faq.a}\n\nTautan Resmi: ${faqAnchor}\nHotline 24 Jam: ${CONTACT_INFO.phoneDisplay}\nLegalitas: NIB KBLI 37011 • IPLT Sumur Batu\n\nPT Kusuma Gemilang Raya`;
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    setActiveShareMenuId(null);
+  };
+
+  const handleCopyFaqDirectText = (faq: FaqItem, index: number) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://sedotwcbekasi.co.id';
+    const faqAnchor = `${origin}/#faq-${faq.id || (index + 1)}`;
+    const text = `[FAQ PT Kusuma Gemilang Raya]\nQ: ${faq.q}\nA: ${faq.a}\nRef: ${faqAnchor}`;
+    navigator.clipboard.writeText(text).then(() => {
+      const idKey = String(faq.id || index + 1);
+      setCopiedShareFaqId(idKey);
+      setTimeout(() => setCopiedShareFaqId(null), 2000);
+      setActiveShareMenuId(null);
     });
   };
 
@@ -241,6 +313,20 @@ export default function PrintFaqModal({
                   <span>Salin Teks</span>
                 </>
               )}
+            </button>
+
+            {/* Export to CSV Button */}
+            <button
+              type="button"
+              onClick={() => exportFaqsToCsv(faqs, {
+                activeCategory,
+                searchQuery
+              })}
+              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-emerald-950 text-slate-200 hover:text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border border-slate-700 hover:border-emerald-500/50"
+              title="Unduh seluruh data FAQ sebagai file tabel CSV"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <span>Export CSV</span>
             </button>
 
             {/* Print Button */}
@@ -296,66 +382,67 @@ export default function PrintFaqModal({
             ref={printableAreaRef}
             className="relative overflow-hidden max-w-3xl mx-auto bg-white p-6 sm:p-12 rounded-2xl shadow-md border border-slate-200 text-slate-800 font-sans print:shadow-none print:border-none print:p-0 print:overflow-visible"
           >
-            {/* SEMI-TRANSPARENT DIAGONAL 'OFFICIAL DOCUMENT' WATERMARK OVERLAY */}
+            {/* SUBTLE 'DRAFT' WATERMARK OVERLAY ACROSS THE ENTIRE PRINTABLE AREA */}
             <div 
+              id="faq-print-draft-watermark"
               aria-hidden="true"
               className="faq-watermark-overlay pointer-events-none select-none absolute inset-0 z-0 overflow-hidden flex flex-col justify-around items-center"
             >
-              {/* Seamless repeating diagonal SVG pattern for continuous full-document coverage */}
+              {/* Seamless repeating diagonal DRAFT watermark pattern */}
               <svg 
-                className="absolute inset-0 w-full h-full opacity-[0.05] print:opacity-[0.07]" 
+                className="absolute inset-0 w-full h-full opacity-[0.035] print:opacity-[0.05]" 
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <defs>
                   <pattern 
-                    id="official-doc-watermark-pattern" 
-                    width="440" 
-                    height="280" 
+                    id="draft-watermark-pattern" 
+                    width="380" 
+                    height="240" 
                     patternUnits="userSpaceOnUse" 
                     patternTransform="rotate(-30 60 60)"
                   >
                     <text 
-                      x="20" 
-                      y="110" 
-                      fontFamily="system-ui, -apple-system, sans-serif" 
-                      fontSize="32" 
+                      x="30" 
+                      y="95" 
+                      fontFamily="ui-sans-serif, system-ui, -apple-system, sans-serif" 
+                      fontSize="54" 
                       fontWeight="900" 
-                      letterSpacing="5" 
+                      letterSpacing="12" 
                       fill="#0f172a"
                     >
-                      OFFICIAL DOCUMENT
+                      DRAFT
                     </text>
                     <text 
-                      x="25" 
-                      y="140" 
-                      fontFamily="system-ui, -apple-system, sans-serif" 
+                      x="32" 
+                      y="128" 
+                      fontFamily="ui-sans-serif, system-ui, -apple-system, sans-serif" 
                       fontSize="10" 
-                      fontWeight="700" 
-                      letterSpacing="3" 
+                      fontWeight="800" 
+                      letterSpacing="4" 
                       fill="#334155"
                     >
-                      PT KUSUMA GEMILANG RAYA • SANITASI RESMI BEKASI
+                      PT KUSUMA GEMILANG RAYA • FAQ
                     </text>
                   </pattern>
                 </defs>
-                <rect width="100%" height="100%" fill="url(#official-doc-watermark-pattern)" />
+                <rect width="100%" height="100%" fill="url(#draft-watermark-pattern)" />
               </svg>
 
-              {/* Prominent diagonal stamped watermarks across document height */}
+              {/* Diagonal prominent yet subtle 'DRAFT' stamps across document height */}
               <div className="relative w-full h-full flex flex-col justify-around items-center py-16 gap-36">
                 {[...Array(6)].map((_, idx) => (
                   <div
                     key={idx}
-                    className="transform -rotate-[32deg] text-center whitespace-nowrap opacity-[0.055] print:opacity-[0.075]"
+                    className="transform -rotate-[32deg] text-center whitespace-nowrap opacity-[0.035] print:opacity-[0.055]"
                   >
-                    <div className="inline-flex flex-col items-center border-[3.5px] border-dashed border-slate-900 px-8 py-3 rounded-2xl tracking-[0.25em] font-black uppercase shadow-xs">
-                      <span className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 tracking-[0.22em]">
-                        OFFICIAL DOCUMENT
+                    <div className="inline-flex flex-col items-center border-[3.5px] border-dashed border-slate-700/80 px-10 py-3.5 rounded-2xl tracking-[0.3em] font-black uppercase shadow-xs">
+                      <span className="text-5xl sm:text-6xl md:text-7xl font-black text-slate-900 tracking-[0.25em]">
+                        DRAFT
                       </span>
                       <div className="flex items-center gap-2 mt-1 text-[10px] sm:text-xs font-black tracking-[0.35em] text-slate-800">
                         <span>PT KUSUMA GEMILANG RAYA</span>
                         <span>•</span>
-                        <span>LEMBAR RESMI PERUSAHAAN</span>
+                        <span>INFORMATIONAL COPY</span>
                       </div>
                     </div>
                   </div>
@@ -365,13 +452,73 @@ export default function PrintFaqModal({
 
             {/* Document Content - relative z-10 for sharp readability over watermark */}
             <div className="relative z-10">
+              {/* TOP CENTERED OFFICIAL LOGO OF PT KUSUMA GEMILANG RAYA (OPTIMIZED FOR A4 PRINT) */}
+              <div 
+                id="faq-print-official-logo"
+                className="flex flex-col items-center justify-center mb-4 text-center break-inside-avoid print:break-inside-avoid"
+              >
+                {/* High-Quality Centered Logo Box for A4 Print */}
+                <div className="relative inline-flex items-center justify-center p-1.5 sm:p-2 bg-white rounded-2xl border-2 border-[#0A192F] print:border-black shadow-xs print:shadow-none">
+                  <img
+                    src={CONTACT_INFO.logoUrl}
+                    alt="Logo Resmi PT Kusuma Gemilang Raya"
+                    className="w-20 h-20 sm:w-24 sm:h-24 print:w-20 print:h-20 object-contain rounded-xl"
+                    loading="eager"
+                    decoding="sync"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                {/* Official Letterhead Subtitle Under Logo */}
+                <div className="mt-2 flex flex-col items-center gap-0.5">
+                  <span className="text-xs sm:text-sm font-black tracking-widest uppercase text-[#0A192F] print:text-black">
+                    PT KUSUMA GEMILANG RAYA
+                  </span>
+                  <div className="flex items-center gap-1.5 text-[8.5px] sm:text-[9.5px] font-bold tracking-[0.2em] uppercase text-slate-600 print:text-slate-800">
+                    <span>BADAN USAHA SANITASI RESMI</span>
+                    <span>•</span>
+                    <span>KOTA & KABUPATEN BEKASI</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* TOP 'GENERATED ON' LIVE SNAPSHOT DATE STAMP */}
+              <div 
+                id="faq-generated-on-stamp"
+                className="mb-3.5 px-3.5 py-2 bg-slate-50 print:bg-white rounded-xl border border-slate-300 print:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs shadow-2xs print:shadow-none break-inside-avoid"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 text-slate-800 print:text-black">
+                    <Clock className="w-3.5 h-3.5 text-emerald-600 print:text-black shrink-0" />
+                    <span className="uppercase text-[10px] tracking-wider text-slate-600 print:text-slate-700 font-extrabold">Generated on:</span>
+                    <span className="font-bold text-[#0A192F] print:text-black font-mono text-[11px] bg-white print:bg-transparent px-2 py-0.5 rounded border border-slate-200 print:border-none shadow-2xs print:shadow-none">
+                      {docMeta.generatedOn}
+                    </span>
+                  </span>
+                  <span className="text-slate-300 print:text-slate-400">•</span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-800 print:text-slate-700 bg-emerald-50 print:bg-slate-100 px-2 py-0.5 rounded-full border border-emerald-200 print:border-slate-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse print:hidden" />
+                    Live Snapshot Informasi Layanan
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500 print:text-slate-600">
+                  <span className="hidden sm:inline">REF:</span>
+                  <span className="font-bold text-slate-700 print:text-black">{docMeta.docRef}</span>
+                </div>
+              </div>
+
               {/* TOP OFFICIAL DOCUMENT TITLE */}
-              <h1 className="text-center font-bold text-xl sm:text-2xl text-[#0A192F] uppercase tracking-wide mb-4 pb-2 border-b border-slate-300 print:border-slate-800 print:text-black">
-                PT KUSUMA GEMILANG RAYA - FAQ RESMI
+              <h1 
+                id="faq-document-title"
+                className="text-center font-black text-xl sm:text-2xl text-[#0A192F] uppercase tracking-wide mb-3 pb-2.5 border-b border-slate-300 print:border-slate-800 print:text-black break-inside-avoid"
+              >
+                FAQ Layanan Sanitasi - PT Kusuma Gemilang Raya
               </h1>
 
-              {/* Header Surat Resmi PT Kusuma Gemilang Raya */}
-              <div id="faq-main-header" className="border-b-2 border-slate-900 pb-5 mb-5">
+              {/* Header Surat Resmi PT Kusuma Gemilang Raya with Complete Company Contact Details */}
+              <header 
+                id="faq-main-header" 
+                className="border-b-2 border-slate-900 pb-5 mb-5 break-inside-avoid"
+              >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2.5 flex-wrap">
@@ -382,14 +529,39 @@ export default function PrintFaqModal({
                         LEGAL & RESMI IPLT
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 mt-1 font-medium">
+                    <p className="text-xs text-slate-700 font-bold mt-1">
+                      FAQ Layanan Sanitasi • Panduan Standar Pelayanan & Teknis Pengurasan Limbah
+                    </p>
+                    <p className="text-[11.5px] text-slate-600 mt-0.5 font-medium">
                       Spesialis Jasa Sanitasi, Pengurasan Septic Tank & Penanganan Limbah Cair Industri Berizin
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                      <span>Wilayah Kerja: {CONTACT_INFO.legal.serviceArea}</span>
-                      <span>• Hotline 24 Jam: {CONTACT_INFO.phoneDisplay}</span>
-                      <span>• {CONTACT_INFO.legal.nib}</span>
-                    </p>
+
+                    {/* Complete Company Contact Details */}
+                    <div 
+                      id="faq-company-contact-details" 
+                      className="mt-2.5 pt-2 border-t border-slate-200 print:border-slate-400 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-600 print:text-slate-900"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-emerald-600 print:text-black shrink-0" />
+                        <span><strong>Hotline 24 Jam:</strong> {CONTACT_INFO.phoneDisplay}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <MessageCircle className="w-3.5 h-3.5 text-emerald-600 print:text-black shrink-0" />
+                        <span><strong>WhatsApp CS:</strong> {CONTACT_INFO.phoneDisplay}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-emerald-600 print:text-black shrink-0" />
+                        <span><strong>Wilayah Layanan:</strong> {CONTACT_INFO.legal.serviceArea}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-emerald-600 print:text-black shrink-0" />
+                        <span><strong>Jam Operasional:</strong> {CONTACT_INFO.legal.operationalHours}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 col-span-1 sm:col-span-2 text-[10.5px] text-slate-500 print:text-slate-700 mt-0.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 print:text-black shrink-0" />
+                        <span><strong>Legalitas:</strong> {CONTACT_INFO.legal.nib} • {CONTACT_INFO.legal.cert} • {CONTACT_INFO.legal.tax}</span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* PROMINENT OFFICIAL 'LEGAL & LICENSED' CIRCULAR SEAL */}
@@ -465,6 +637,7 @@ export default function PrintFaqModal({
                     </div>
                   </div>
                 </div>
+              </header>
 
               {/* DATE & TIMESTAMP HEADER - OFFICIAL METADATA BAR */}
               <div 
@@ -476,8 +649,8 @@ export default function PrintFaqModal({
                     <FileText className="w-3.5 h-3.5 text-[#00C2CB]" />
                     LEMBAR PUBLIKASI & REFERENSI TANYA JAWAB (FAQ) RESMI
                   </span>
-                  <span className="font-mono text-slate-700">
-                    REF NO: {docMeta.docRef}
+                  <span className="font-mono text-slate-700 text-[9px] sm:text-[10px]">
+                    REF NO: {docMeta.docRef} • GENERATED: {docMeta.generatedOn}
                   </span>
                 </div>
 
@@ -582,7 +755,6 @@ export default function PrintFaqModal({
                   <span>Sistem Verifikasi PT KGR</span>
                 </div>
               </div>
-            </div>
 
             {/* DAFTAR ISI (TABLE OF CONTENTS) NAVIGATIONAL LINK SECTION */}
             <div 
@@ -653,6 +825,40 @@ export default function PrintFaqModal({
               </div>
             </div>
 
+            {/* HIGH-CONTRAST COMPLIANCE NOTICE BLOCK FOR PRINT & DIGITAL READERS */}
+            <div 
+              id="faq-print-compliance-notice"
+              className="mb-6 p-4 rounded-2xl bg-[#0A192F] text-white print:bg-white print:text-black border-2 border-emerald-500 print:border-black shadow-xs break-inside-avoid print:break-inside-avoid"
+            >
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 print:bg-slate-100 border border-emerald-400 print:border-black flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-6 h-6 text-emerald-400 print:text-black" />
+                </div>
+                <div className="flex-1 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="font-black uppercase tracking-wider text-[10px] text-emerald-300 print:text-black bg-emerald-500/10 print:bg-slate-200 px-2 py-0.5 rounded border border-emerald-400/30 print:border-black">
+                      COMPLIANCE NOTICE • STANDAR REGULASI PERDA & LINGKUNGAN HIDUP
+                    </span>
+                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 print:bg-black print:text-white">
+                      100% AMAN & LEGAL
+                    </span>
+                  </div>
+                  <h3 className="font-extrabold text-sm text-white print:text-black leading-snug">
+                    Pemberitahuan Kepatuhan Hukum & Baku Mutu Pembuangan Limbah
+                  </h3>
+                  <p className="text-[11px] text-slate-200 print:text-slate-800 mt-1 leading-relaxed">
+                    Seluruh armada dan teknisi PT Kusuma Gemilang Raya beroperasi di bawah kepatuhan ketat <strong>Peraturan Daerah (Perda) Kota & Kabupaten Bekasi</strong> mengenai pengelolaan air limbah domestik dan industri non-B3. Pembuangan limbah disalurkan secara tertib ke instalasi pengolahan resmi <strong>IPLT Sumur Batu</strong> dan diverifikasi dengan dokumen Berita Acara & Manifest sah untuk audit ISO/lingkungan klien komersial.
+                  </p>
+                  <div className="mt-2 pt-1.5 border-t border-slate-700 print:border-slate-300 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-300 print:text-slate-900 font-semibold">
+                    <span>✓ Kepatuhan Perda Lingkungan Hidup</span>
+                    <span>✓ Pembuangan Resmi IPLT Sumur Batu</span>
+                    <span>✓ Manifest Limbah Siap Audit</span>
+                    <span>✓ NIB KBLI 37011 Berizin Resmi</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Judul Isi Dokumen */}
             <div className="mb-6">
               <h2 className="text-lg sm:text-xl font-black text-[#0A192F]">
@@ -690,33 +896,118 @@ export default function PrintFaqModal({
 
                     <div 
                       id={`faq-item-${index + 1}`}
-                      className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 break-inside-avoid print:bg-white print:border-slate-300 shadow-2xs print:shadow-none"
+                      className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 break-inside-avoid print:bg-white print:border-slate-300 shadow-2xs print:shadow-none relative"
                     >
-                      <div className="flex items-start gap-2.5 mb-2">
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-[#0A192F] text-white font-bold text-xs shrink-0 print:border print:border-black">
-                          {index + 1}
-                        </span>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            {faq.category && (
-                              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider bg-slate-200/80 px-1.5 py-0.5 rounded print:border print:border-slate-400">
-                                {faq.category}
-                              </span>
-                            )}
-                            {faq.badge && (
-                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                {faq.badge === 'Verified' ? 'Terverifikasi' : 'Standar Resmi'}
-                              </span>
-                            )}
-                            {faq.highlightType === 'pricing' && (
-                              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
-                                Tarif Resmi
-                              </span>
-                            )}
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex items-start gap-2.5 flex-1">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-[#0A192F] text-white font-bold text-xs shrink-0 print:border print:border-black">
+                            {index + 1}
+                          </span>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              {faq.category && (
+                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider bg-slate-200/80 px-1.5 py-0.5 rounded print:border print:border-slate-400">
+                                  {faq.category}
+                                </span>
+                              )}
+                              {faq.badge && (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                  {faq.badge === 'Verified' ? 'Terverifikasi' : 'Standar Resmi'}
+                                </span>
+                              )}
+                              {faq.highlightType === 'pricing' && (
+                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded">
+                                  Tarif Resmi
+                                </span>
+                              )}
+                            </div>
+                            <h4 className="font-bold text-sm text-[#0A192F] leading-snug">
+                              {faq.q}
+                            </h4>
                           </div>
-                          <h4 className="font-bold text-sm text-[#0A192F] leading-snug">
-                            {faq.q}
-                          </h4>
+                        </div>
+
+                        {/* Quick Share Action Button next to FAQ Header (Screen Only - hidden when printing) */}
+                        <div className="relative shrink-0 no-print faq-share-container">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const itemKey = String(faq.id || index + 1);
+                              setActiveShareMenuId(activeShareMenuId === itemKey ? null : itemKey);
+                            }}
+                            className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold ${
+                              activeShareMenuId === String(faq.id || index + 1)
+                                ? 'bg-[#00C2CB] text-[#0A192F] border-[#00C2CB] shadow-xs'
+                                : 'bg-white text-slate-600 hover:text-[#0A192F] hover:bg-slate-100 border-slate-200'
+                            }`}
+                            title="Bagikan pertanyaan ini ke WhatsApp, Twitter, atau Email"
+                            aria-label={`Bagikan pertanyaan ${faq.q}`}
+                          >
+                            <Share2 className="w-3.5 h-3.5 text-[#00C2CB] group-hover:scale-110" />
+                            <span className="hidden sm:inline text-[11px]">Bagikan</span>
+                          </button>
+
+                          {/* Quick Share Flyout Menu */}
+                          {activeShareMenuId === String(faq.id || index + 1) && (
+                            <div 
+                              className="absolute right-0 top-full mt-1.5 z-30 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-2 text-xs animate-fadeIn"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
+                                Bagikan Tanya Jawab
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleShareWhatsApp(faq, index)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 transition-colors cursor-pointer text-left font-medium"
+                              >
+                                <span className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                </span>
+                                <span>Kirim ke WhatsApp</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleShareTwitter(faq, index)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-sky-50 text-slate-700 hover:text-sky-800 transition-colors cursor-pointer text-left font-medium"
+                              >
+                                <span className="w-6 h-6 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+                                  <Twitter className="w-3.5 h-3.5" />
+                                </span>
+                                <span>Bagikan ke Twitter / X</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleShareEmail(faq, index)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-indigo-50 text-slate-700 hover:text-indigo-800 transition-colors cursor-pointer text-left font-medium"
+                              >
+                                <span className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                  <Mail className="w-3.5 h-3.5" />
+                                </span>
+                                <span>Kirim via Email</span>
+                              </button>
+                              <div className="border-t border-slate-100 my-1" />
+                              <button
+                                type="button"
+                                onClick={() => handleCopyFaqDirectText(faq, index)}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer text-left font-medium"
+                              >
+                                <span className="w-6 h-6 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                                  {copiedShareFaqId === String(faq.id || index + 1) ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </span>
+                                <span>
+                                  {copiedShareFaqId === String(faq.id || index + 1)
+                                    ? 'Tersalin ke Clipboard!'
+                                    : 'Salin Teks FAQ'}
+                                </span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -763,14 +1054,26 @@ export default function PrintFaqModal({
                       {/* High-Resolution Scannable QR Code */}
                       <div className="shrink-0 flex flex-col items-center relative">
                         {/* High-Contrast 'Scan Me' Visual Icon & Arrow Indicator pointing directly at QR Code */}
-                        <div 
-                          id="faq-scan-me-indicator"
-                          className="mb-1.5 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#0A192F] text-amber-300 border-2 border-amber-400 font-black text-[9px] tracking-wider uppercase shadow-xs print:bg-black print:text-white print:border-black"
-                          title="Scan Me: Pindai untuk WhatsApp Booking Cepat"
-                        >
-                          <Scan className="w-3 h-3 text-[#00C2CB] print:text-white shrink-0" />
-                          <span className="font-extrabold">SCAN ME</span>
-                          <ArrowDown id="faq-scan-me-arrow" className="w-2.5 h-2.5 text-amber-300 print:text-white shrink-0 animate-bounce print:animate-none" />
+                        <div className="relative group/scanme flex flex-col items-center">
+                          <div 
+                            id="faq-scan-me-indicator"
+                            className="mb-1 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#0A192F] text-amber-300 border-2 border-amber-400 font-black text-[9px] tracking-wider uppercase shadow-xs print:bg-black print:text-white print:border-black cursor-help"
+                            title="Cara Scan: Buka kamera HP atau Google Lens & arahkan ke QR Code"
+                          >
+                            <Scan className="w-3 h-3 text-[#00C2CB] print:text-white shrink-0" />
+                            <span className="font-extrabold">SCAN ME</span>
+                            <ArrowDown id="faq-scan-me-arrow" className="w-2.5 h-2.5 text-amber-300 print:text-white shrink-0 animate-bounce print:animate-none" />
+                          </div>
+
+                          {/* 'How to Scan' Tooltip / Quick Instruction Block near Scan Me Indicator */}
+                          <div 
+                            id="faq-how-to-scan-tooltip"
+                            className="mb-1 px-2 py-0.5 rounded bg-slate-900 text-amber-200 border border-amber-400/80 text-[8px] font-semibold text-center flex items-center gap-1 shadow-xs print:bg-white print:text-slate-900 print:border-slate-400"
+                            title="Petunjuk praktis pemindaian QR code"
+                          >
+                            <Camera className="w-2.5 h-2.5 text-[#00C2CB] print:text-black shrink-0" />
+                            <span><strong>How to scan:</strong> Buka Kamera HP &gt; Arahkan ke QR</span>
+                          </div>
                         </div>
 
                         <div className="relative">
@@ -952,6 +1255,79 @@ export default function PrintFaqModal({
               </div>
             </div>
 
+            {/* PROMINENT OFFICIAL COMPANY WHATSAPP QR CODE AT DOCUMENT BOTTOM */}
+            <div 
+              id="faq-bottom-official-qr-code" 
+              className="mt-7 p-4 bg-gradient-to-r from-emerald-50 via-teal-50/60 to-slate-50 print:bg-white rounded-2xl border-2 border-emerald-500/80 print:border-slate-800 shadow-xs print:shadow-none break-inside-avoid print:break-inside-avoid"
+            >
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                {/* Text & Contact Directives */}
+                <div className="flex-1 text-center sm:text-left">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white print:bg-black print:text-white font-extrabold text-[9px] uppercase tracking-wider mb-1.5">
+                    <MessageCircle className="w-3 h-3 text-[#00C2CB] print:text-white shrink-0" />
+                    <span>WhatsApp Booking & Konsultasi Resmi 24 Jam</span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-[#0A192F] print:text-black tracking-tight">
+                    Butuh Layanan Cepat? Pindai QR Code WhatsApp Ini
+                  </h3>
+                  <p className="text-xs text-slate-600 print:text-slate-800 mt-1 max-w-md leading-relaxed">
+                    Arahkan kamera ponsel Anda langsung ke kode QR resmi PT Kusuma Gemilang Raya untuk terhubung dengan tim customer service & dispatch armada terdekat di Kota / Kab. Bekasi tanpa perlu menyimpan nomor terlebih dahulu.
+                  </p>
+                  
+                  <div className="mt-2.5 flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-[11px] font-bold text-slate-700 print:text-slate-900">
+                    <span className="flex items-center gap-1 text-emerald-800 print:text-black">
+                      <Phone className="w-3.5 h-3.5 text-emerald-600 print:text-black" />
+                      Hotline: {CONTACT_INFO.phoneDisplay}
+                    </span>
+                    <span>•</span>
+                    <span className="font-mono text-slate-600 print:text-slate-900">
+                      wa.me/{CONTACT_INFO.phoneRaw}
+                    </span>
+                    <span>•</span>
+                    <span className="text-emerald-700 print:text-slate-800 font-semibold text-[10px]">
+                      Siaga 24 Jam Nonstop
+                    </span>
+                  </div>
+                </div>
+
+                {/* Prominent High-Contrast QR Code Card */}
+                <div className="shrink-0 flex flex-col items-center">
+                  <div className="relative group p-2.5 bg-white rounded-2xl border-2 border-slate-900 print:border-black shadow-md print:shadow-none text-center">
+                    {/* Badge on QR frame */}
+                    <div className="mb-1 flex items-center justify-center gap-1 bg-[#0A192F] text-amber-300 print:bg-black print:text-white px-2 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider">
+                      <Scan className="w-2.5 h-2.5 text-[#00C2CB] print:text-white" />
+                      <span>PINDAI DISINI</span>
+                    </div>
+
+                    <a 
+                      href={bookingWhatsAppUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block cursor-pointer transition-transform hover:scale-105"
+                      title="Klik atau scan untuk membuka chat WhatsApp resmi"
+                    >
+                      {qrCodeDataUrl ? (
+                        <img 
+                          src={qrCodeDataUrl} 
+                          alt="QR Code WhatsApp Resmi PT Kusuma Gemilang Raya" 
+                          className="w-28 h-28 sm:w-32 sm:h-32 object-contain mx-auto"
+                          loading="eager"
+                        />
+                      ) : (
+                        <div className="w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center bg-slate-100 text-slate-400 text-xs">
+                          Memuat QR...
+                        </div>
+                      )}
+                    </a>
+
+                    <div className="mt-1 pt-1 border-t border-slate-200 text-[8.5px] font-extrabold uppercase tracking-wide text-slate-700 print:text-black">
+                      Official WhatsApp QR
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Footer Dokumen Resmi */}
             <div className="mt-8 pt-5 border-t border-slate-300 text-xs text-slate-500 break-inside-avoid">
               <div className="flex flex-col sm:flex-row justify-between gap-4">
@@ -1031,24 +1407,26 @@ export default function PrintFaqModal({
             </div>
 
             {/* RUNNING REPEATING PRINT FOOTER FOR MULTI-PAGE EXPORTS (PRINT ONLY) */}
-            <div 
+            <footer 
+              id="faq-running-print-footer"
               aria-hidden="true" 
               className="faq-running-print-footer hidden print:flex"
             >
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900">PT KUSUMA GEMILANG RAYA</span>
+              <div className="flex items-center gap-2 text-[8pt] text-slate-800">
+                <span className="font-extrabold text-slate-900">FAQ Layanan Sanitasi - PT Kusuma Gemilang Raya</span>
                 <span>•</span>
-                <span>FAQ RESMI SANITASI BEKASI</span>
+                <span>Hotline: {CONTACT_INFO.phoneDisplay}</span>
                 <span>•</span>
                 <span>REF: {docMeta.docRef}</span>
               </div>
-              <div className="flex items-center gap-1 border border-slate-400 bg-slate-50 px-2.5 py-0.5 rounded font-bold text-slate-900">
+              <div className="flex items-center gap-1.5 border border-slate-600 bg-slate-50 px-2 py-0.5 rounded font-mono font-bold text-slate-900 text-[8pt]">
+                <span className="uppercase text-[7pt] tracking-wider text-slate-600">Halaman /</span>
                 <span>Page</span>
                 <span className="faq-page-counter-curr"></span>
                 <span>of</span>
                 <span>{totalPages}</span>
               </div>
-            </div>
+            </footer>
             </div>
           </div>
         </div>
@@ -1065,6 +1443,18 @@ export default function PrintFaqModal({
               className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold border border-slate-300 transition-colors cursor-pointer"
             >
               Tutup Pratinjau
+            </button>
+            <button
+              type="button"
+              onClick={() => exportFaqsToCsv(faqs, {
+                activeCategory,
+                searchQuery
+              })}
+              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              title="Unduh seluruh FAQ sebagai CSV"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-200" />
+              <span>Export CSV</span>
             </button>
             <button
               type="button"

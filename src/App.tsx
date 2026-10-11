@@ -33,7 +33,9 @@ import {
   Share2,
   Link2,
   Copy,
-  Printer
+  Printer,
+  FileSpreadsheet,
+  Download
 } from 'lucide-react';
 import { 
   CONTACT_INFO, 
@@ -60,6 +62,7 @@ import FaqSocialShare from './components/FaqSocialShare';
 import AutoRedirectModal from './components/AutoRedirectModal';
 import AutoRedirectFloatingWidget from './components/AutoRedirectFloatingWidget';
 import InstantEstimateButton from './components/InstantEstimateButton';
+import { exportFaqsToCsv } from './utils/exportCsv';
 import { initConversionTracking } from './utils/conversionTracker';
 import { 
   detectDevice, 
@@ -1197,7 +1200,7 @@ export default function App() {
               Informasi penting seputar layanan sedot WC, limbah STP, dan kepatuhan legalitas di Bekasi.
             </p>
             
-            {/* Header Action: Print FAQ Button & Social Media Broadcast Icons */}
+            {/* Header Action: Print FAQ Button, Export to CSV Button & Social Media Broadcast Icons */}
             <div className="mt-6 flex flex-col items-center justify-center gap-3.5">
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
@@ -1210,6 +1213,24 @@ export default function App() {
                   <span>Cetak Dokumen FAQ (Print / PDF)</span>
                   <span className="bg-[#00C2CB]/15 text-[#0A192F] font-black text-[11px] px-2 py-0.5 rounded-full">
                     {filteredFaqs.length} Q&A
+                  </span>
+                </button>
+
+                {/* Export to CSV Button */}
+                <button
+                  type="button"
+                  id="faq-export-csv-btn"
+                  onClick={() => exportFaqsToCsv(filteredFaqs, {
+                    activeCategory: faqCategoryFilter,
+                    searchQuery: faqSearchQuery
+                  })}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 text-xs sm:text-sm font-bold border-2 border-slate-200 hover:border-emerald-500 shadow-xs transition-all cursor-pointer group hover:shadow-md active:scale-98"
+                  title="Unduh seluruh data FAQ yang sedang difilter sebagai file tabel CSV terstruktur"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
+                  <span>Export to CSV</span>
+                  <span className="bg-emerald-100 text-emerald-800 font-black text-[11px] px-2 py-0.5 rounded-full">
+                    CSV ({filteredFaqs.length})
                   </span>
                 </button>
               </div>
@@ -1334,6 +1355,18 @@ export default function App() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => exportFaqsToCsv(filteredFaqs, {
+                      activeCategory: faqCategoryFilter,
+                      searchQuery: faqSearchQuery
+                    })}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs hover:border-emerald-300 transition-all cursor-pointer"
+                    title="Unduh daftar FAQ yang difilter sebagai CSV"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>CSV</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => {
                       setFaqSearchQuery('');
                       setFaqCategoryFilter('Semua');
@@ -1345,6 +1378,69 @@ export default function App() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* HIGH-CONTRAST COMPLIANCE NOTICE BLOCK FOR COMMERCIAL CLIENTS */}
+          <div 
+            id="faq-compliance-notice"
+            className="mb-8 p-5 sm:p-6 rounded-3xl bg-[#0A192F] text-white border-2 border-emerald-400 shadow-xl relative overflow-hidden"
+          >
+            {/* Ambient accent background glows */}
+            <div className="absolute -top-16 -right-16 w-48 h-48 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-[#00C2CB]/15 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/80 flex items-center justify-center shrink-0 shadow-inner">
+                  <ShieldCheck className="w-7 h-7 text-emerald-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-xs font-black tracking-widest uppercase text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-400/10 border border-emerald-400/30">
+                      COMPLIANCE NOTICE • KEPATUHAN LINGKUNGAN
+                    </span>
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-400 text-slate-950">
+                      STANDAR PERDA BEKASI
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
+                    Jaminan Kepatuhan Regulasi Lingkungan Hidup & Standar Pembuangan Limbah
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed max-w-3xl">
+                    Seluruh penanganan limbah tinja, lumpur septic tank, dan STP komersial yang dilaksanakan oleh <strong>PT Kusuma Gemilang Raya</strong> mematuhi <strong>Peraturan Daerah (Perda) Kota & Kabupaten Bekasi</strong> serta baku mutu lingkungan hidup. Seluruh hasil sedot dibuang secara resmi ke <strong>IPLT Sumur Batu</strong> dan diverifikasi dengan dokumen <em>Berita Acara Manifest Pembuangan Resmi</em> untuk audit ISO / AMDAL klien komersial & industri.
+                  </p>
+
+                  <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-300">
+                    <span className="inline-flex items-center gap-1.5 text-emerald-300 font-bold">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      100% Legal IPLT Sumur Batu
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-amber-300 font-bold">
+                      <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+                      Manifest & Dokumen Limbah Sah
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-cyan-300 font-bold">
+                      <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
+                      NIB KBLI 37011 Berizin
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="shrink-0 w-full md:w-auto flex md:flex-col items-center justify-between gap-2.5 pt-3 md:pt-0 border-t md:border-t-0 md:border-l border-slate-700 md:pl-5">
+                <button
+                  type="button"
+                  onClick={() => setShowPrintFaqModal(true)}
+                  className="w-full md:w-auto px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-[#0A192F] font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Unduh Dokumen Legal</span>
+                </button>
+                <span className="text-[10px] text-slate-400 font-mono text-center block">
+                  REF: REG-PERDA-2026
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* FAQ Accordion List or Empty State */}
@@ -1563,12 +1659,13 @@ export default function App() {
                         : 'border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    <button
-                      onClick={() => toggleFaq(faq.q)}
-                      className="w-full text-left p-5 sm:p-6 flex items-start sm:items-center justify-between gap-4 font-bold text-base text-[#0A192F] cursor-pointer hover:text-[#00C2CB] transition-colors group"
-                      aria-expanded={isOpen}
-                    >
-                      <div className="flex items-start sm:items-center gap-3.5 flex-1">
+                    <div className="w-full p-5 sm:p-6 flex items-start sm:items-center justify-between gap-4 font-bold text-base text-[#0A192F]">
+                      <button
+                        type="button"
+                        onClick={() => toggleFaq(faq.q)}
+                        className="flex items-start sm:items-center gap-3.5 flex-1 text-left cursor-pointer hover:text-[#00C2CB] transition-colors group"
+                        aria-expanded={isOpen}
+                      >
                         <div
                           className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-2xs ${
                             isPricing
@@ -1670,9 +1767,9 @@ export default function App() {
                             </span>
                           </div>
                         </div>
-                      </div>
+                      </button>
 
-                      {/* Right Action: Share Link button + Chevron */}
+                      {/* Right Action: Share Link button + Chevron toggle */}
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
@@ -1697,13 +1794,21 @@ export default function App() {
                             </>
                           )}
                         </button>
-                        <ChevronDown
-                          className={`w-5 h-5 text-[#00C2CB] shrink-0 transition-transform duration-300 ${
-                            isOpen ? 'rotate-180' : ''
-                          }`}
-                        />
+                        <button
+                          type="button"
+                          onClick={() => toggleFaq(faq.q)}
+                          className="p-1 rounded-lg hover:bg-slate-100 text-[#00C2CB] transition-colors cursor-pointer"
+                          aria-label={isOpen ? "Tutup pertanyaan" : "Buka pertanyaan"}
+                          aria-expanded={isOpen}
+                        >
+                          <ChevronDown
+                            className={`w-5 h-5 text-[#00C2CB] shrink-0 transition-transform duration-300 ${
+                              isOpen ? 'rotate-180' : ''
+                            }`}
+                          />
+                        </button>
                       </div>
-                    </button>
+                    </div>
 
                     {isOpen && (
                       <div className="px-5 pb-6 sm:px-6 pt-0 text-sm text-slate-600 leading-relaxed border-t border-slate-100 mt-1">
