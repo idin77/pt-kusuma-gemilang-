@@ -35,7 +35,8 @@ import {
   Copy,
   Printer,
   FileSpreadsheet,
-  Download
+  Download,
+  BookOpen
 } from 'lucide-react';
 import { 
   CONTACT_INFO, 
@@ -63,6 +64,8 @@ import AutoRedirectModal from './components/AutoRedirectModal';
 import AutoRedirectFloatingWidget from './components/AutoRedirectFloatingWidget';
 import InstantEstimateButton from './components/InstantEstimateButton';
 import { exportFaqsToCsv } from './utils/exportCsv';
+import { playFaqClickSound } from './utils/soundEffects';
+import { calculateFaqReadingTime } from './utils/readingTime';
 import { initConversionTracking } from './utils/conversionTracker';
 import { 
   detectDevice, 
@@ -294,6 +297,11 @@ export default function App() {
 
     return matchesSearch && matchesCategory;
   });
+
+  // Dynamically calculate estimated reading time based on content length of currently displayed FAQs
+  const faqReadingTime = React.useMemo(() => {
+    return calculateFaqReadingTime(filteredFaqs);
+  }, [filteredFaqs]);
 
   const effectiveContext: WhatsAppContext = {
     ...interactionContext,
@@ -1188,7 +1196,10 @@ export default function App() {
 
       {/* FAQ Section with Real-Time Search & Category Filters */}
       <section id="faq" className="py-20 bg-[#F8FAFC]">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div 
+          id={showPrintFaqModal ? "faq-landing-container" : "faq-printable-area"}
+          className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8"
+        >
           <div className="text-center mb-8">
             <span className="text-xs font-extrabold text-[#00C2CB] uppercase tracking-widest block mb-2">
               Tanya Jawab
@@ -1199,18 +1210,39 @@ export default function App() {
             <p className="mt-3 text-base text-slate-600 max-w-2xl mx-auto">
               Informasi penting seputar layanan sedot WC, limbah STP, dan kepatuhan legalitas di Bekasi.
             </p>
+
+            {/* Small 'Estimated Reading Time' Badge */}
+            <div className="mt-3.5 flex items-center justify-center">
+              <div 
+                id="faq-estimated-reading-time-badge"
+                data-testid="estimated-reading-time-badge"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-900 border border-sky-200 shadow-2xs transition-all hover:bg-sky-100/80"
+                title={`Estimated Reading Time: ~${faqReadingTime.minutes} menit (dihitung dari total ${faqReadingTime.totalWords} kata dalam ${filteredFaqs.length} FAQ yang sedang ditampilkan)`}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                <span className="font-semibold text-slate-700">Estimated Reading Time:</span>
+                <span className="font-extrabold text-sky-950">
+                  ~{faqReadingTime.minutes} {faqReadingTime.minutes === 1 ? 'min' : 'mins'}
+                </span>
+                <span className="text-sky-600/70 font-normal text-[11px]">
+                  ({faqReadingTime.totalWords} words)
+                </span>
+              </div>
+            </div>
             
             {/* Header Action: Print FAQ Button, Export to CSV Button & Social Media Broadcast Icons */}
             <div className="mt-6 flex flex-col items-center justify-center gap-3.5">
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
                   type="button"
+                  id="print-faq-btn"
                   onClick={() => setShowPrintFaqModal(true)}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 hover:text-[#0A192F] text-xs sm:text-sm font-bold border-2 border-slate-200 hover:border-[#00C2CB] shadow-xs transition-all cursor-pointer group hover:shadow-md active:scale-98"
                   title="Buka pratinjau ramah cetak (A4 / PDF) untuk referensi profesional"
+                  aria-label="Print FAQ"
                 >
                   <Printer className="w-4 h-4 text-[#00C2CB] group-hover:scale-110 transition-transform" />
-                  <span>Cetak Dokumen FAQ (Print / PDF)</span>
+                  <span>Print FAQ</span>
                   <span className="bg-[#00C2CB]/15 text-[#0A192F] font-black text-[11px] px-2 py-0.5 rounded-full">
                     {filteredFaqs.length} Q&A
                   </span>
@@ -1258,7 +1290,11 @@ export default function App() {
                 <input
                   type="text"
                   value={faqSearchQuery}
+                  onKeyDown={() => {
+                    playFaqClickSound();
+                  }}
                   onChange={(e) => {
+                    playFaqClickSound();
                     const val = e.target.value;
                     setFaqSearchQuery(val);
                     if (val.trim().length > 1 && !activeFaq) {
@@ -1351,7 +1387,7 @@ export default function App() {
                     title="Cetak daftar FAQ yang sedang difilter"
                   >
                     <Printer className="w-3.5 h-3.5 text-[#00C2CB]" />
-                    <span>Cetak ({filteredFaqs.length})</span>
+                    <span>Print FAQ ({filteredFaqs.length})</span>
                   </button>
                   <button
                     type="button"

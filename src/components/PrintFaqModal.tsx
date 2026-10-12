@@ -30,10 +30,20 @@ import {
   Share2,
   Mail,
   Send,
-  Twitter
+  Twitter,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  Truck,
+  Building,
+  Target,
+  Layers,
+  BookOpen
 } from 'lucide-react';
-import { FaqItem, CONTACT_INFO } from '../data/websiteData';
+import { FaqItem, CONTACT_INFO, KOTA_BEKASI, KAB_BEKASI } from '../data/websiteData';
 import { exportFaqsToCsv } from '../utils/exportCsv';
+import { playFaqClickSound } from '../utils/soundEffects';
+import { calculateFaqReadingTime } from '../utils/readingTime';
 
 interface PrintFaqModalProps {
   isOpen: boolean;
@@ -54,8 +64,189 @@ export default function PrintFaqModal({
 }: PrintFaqModalProps) {
   const [copiedAll, setCopiedAll] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+  const [faqQrCodes, setFaqQrCodes] = useState<Record<string, string>>({});
   const [totalPages, setTotalPages] = useState<number>(1);
+  const [highlightMatchesEnabled, setHighlightMatchesEnabled] = useState<boolean>(true);
+  const [inModalSearch, setInModalSearch] = useState<string>('');
   const printableAreaRef = useRef<HTMLDivElement>(null);
+
+  // Sync effective search query from prop or in-modal input
+  const effectiveSearchQuery = inModalSearch.trim() || searchQuery.trim();
+
+  // Filter displayed FAQs if modal search query is active
+  const displayedFaqs = React.useMemo(() => {
+    if (!inModalSearch.trim()) return faqs;
+    const q = inModalSearch.toLowerCase().trim();
+    return faqs.filter(f => 
+      f.q.toLowerCase().includes(q) || 
+      f.a.toLowerCase().includes(q) || 
+      (f.category || '').toLowerCase().includes(q)
+    );
+  }, [faqs, inModalSearch]);
+
+  // Highlight all matching instances of current faqSearchQuery within both question and answer texts
+  const highlightMatches = (text: string, query: string) => {
+    if (!highlightMatchesEnabled || !query || !query.trim()) {
+      return text;
+    }
+    const trimmed = query.trim();
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escaped})`, 'gi');
+    const parts = text.split(regex);
+    if (parts.length <= 1) {
+      return text;
+    }
+
+    return (
+      <>
+        {parts.map((part, i) =>
+          part.toLowerCase() === trimmed.toLowerCase() ? (
+            <mark
+              key={i}
+              className="faq-search-highlight bg-amber-200 text-amber-950 font-bold px-1 py-0.5 rounded border border-amber-300 shadow-2xs print:bg-yellow-100 print:text-black print:border-amber-400"
+              title={`Pencocokan kata kunci: "${trimmed}"`}
+            >
+              {part}
+            </mark>
+          ) : (
+            part
+          )
+        )}
+      </>
+    );
+  };
+
+  // Calculate total matching occurrences across all questions and answers
+  const totalMatchesCount = React.useMemo(() => {
+    if (!effectiveSearchQuery) return 0;
+    const escaped = effectiveSearchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'gi');
+    let count = 0;
+    displayedFaqs.forEach(faq => {
+      const qMatches = (faq.q.match(regex) || []).length;
+      const aMatches = (faq.a.match(regex) || []).length;
+      count += qMatches + aMatches;
+    });
+    return count;
+  }, [displayedFaqs, effectiveSearchQuery]);
+
+  // Dynamic Service Coverage statistics based on filtered FAQ result set
+  const coverageStats = React.useMemo(() => {
+    const totalKota = KOTA_BEKASI.length; // 12
+    const totalKab = KAB_BEKASI.length;   // 23
+    const totalAll = totalKota + totalKab; // 35
+
+    const query = effectiveSearchQuery.toLowerCase().trim();
+    const combinedFaqText = displayedFaqs
+      .map(f => `${f.q} ${f.a} ${f.category || ''}`)
+      .join(' ')
+      .toLowerCase();
+
+    // Check if the filtered FAQs mention broad coverage or include general service questions
+    const hasBroadCoverageMention = 
+      combinedFaqText.includes('seluruh wilayah') ||
+      combinedFaqText.includes('kota bekasi dan kabupaten bekasi') ||
+      combinedFaqText.includes('kota & kabupaten bekasi') ||
+      combinedFaqText.includes('seluruh kecamatan') ||
+      displayedFaqs.length >= 8;
+
+    // Detect matched districts in current query or filtered FAQ content
+    const matchedKota = KOTA_BEKASI.filter(d => {
+      const dLower = d.toLowerCase();
+      return (
+        (query && (query.includes(dLower) || dLower.includes(query) || (query.includes('kota') && !query.includes('kabupaten')))) ||
+        combinedFaqText.includes(dLower)
+      );
+    });
+
+    const matchedKab = KAB_BEKASI.filter(d => {
+      const dLower = d.toLowerCase();
+      const isCikarang = d.startsWith('Cikarang');
+      const cikarangMatch = (query.includes('cikarang') || combinedFaqText.includes('cikarang')) && isCikarang;
+      const tambunMatch = (query.includes('tambun') || combinedFaqText.includes('tambun')) && d.startsWith('Tambun');
+      return (
+        cikarangMatch ||
+        tambunMatch ||
+        (query && (query.includes(dLower) || dLower.includes(query) || query.includes('kabupaten'))) ||
+        combinedFaqText.includes(dLower)
+      );
+    });
+
+    const isSpecificLocationFilter = 
+      query.length > 0 && 
+      (matchedKota.length > 0 || matchedKab.length > 0) &&
+      !query.includes('harga') && 
+      !query.includes('biaya');
+
+    let coveredKotaCount: number;
+    let coveredKabCount: number;
+    let scopeMode: 'full' | 'focused';
+
+    if (isSpecificLocationFilter && (matchedKota.length > 0 || matchedKab.length > 0)) {
+      scopeMode = 'focused';
+      coveredKotaCount = matchedKota.length > 0 ? matchedKota.length : (query.includes('kota') ? totalKota : 0);
+      coveredKabCount = matchedKab.length > 0 ? matchedKab.length : (query.includes('kabupaten') ? totalKab : 0);
+      if (coveredKotaCount === 0 && coveredKabCount === 0) {
+        coveredKotaCount = totalKota;
+        coveredKabCount = totalKab;
+        scopeMode = 'full';
+      }
+    } else if (hasBroadCoverageMention || displayedFaqs.length > 0) {
+      coveredKotaCount = totalKota;
+      coveredKabCount = totalKab;
+      scopeMode = 'full';
+    } else {
+      coveredKotaCount = 0;
+      coveredKabCount = 0;
+      scopeMode = 'focused';
+    }
+
+    const totalCovered = coveredKotaCount + coveredKabCount;
+    const coveragePercentage = totalAll > 0 ? Math.round((totalCovered / totalAll) * 100) : 0;
+
+    return {
+      totalAll,
+      totalKota,
+      totalKab,
+      coveredKotaCount,
+      coveredKabCount,
+      totalCovered,
+      coveragePercentage,
+      scopeMode,
+      matchedKota,
+      matchedKab,
+      hasBroadCoverageMention
+    };
+  }, [displayedFaqs, effectiveSearchQuery]);
+
+  // Dynamically calculate estimated reading time based on content length of currently displayed FAQs
+  const readingTimeStats = React.useMemo(() => {
+    return calculateFaqReadingTime(displayedFaqs);
+  }, [displayedFaqs]);
+
+  // State to track expanded answer states for questions with long-form content
+  const [expandedAnswerIds, setExpandedAnswerIds] = useState<Record<string, boolean>>({});
+
+  const toggleAnswerExpand = (itemId: string) => {
+    setExpandedAnswerIds(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }));
+  };
+
+  const handleToggleExpandAll = () => {
+    const longFaqs = displayedFaqs.filter(f => f.a.length > 180 || f.a.split('\n').length > 2);
+    const allExpanded = longFaqs.length > 0 && longFaqs.every(f => expandedAnswerIds[String(f.id || f.q)]);
+    if (allExpanded) {
+      setExpandedAnswerIds({});
+    } else {
+      const all: Record<string, boolean> = {};
+      longFaqs.forEach(f => {
+        all[String(f.id || f.q)] = true;
+      });
+      setExpandedAnswerIds(all);
+    }
+  };
 
   // Measure content height and calculate dynamic total A4 pages for multi-page exports
   useEffect(() => {
@@ -80,7 +271,7 @@ export default function PrintFaqModal({
       clearTimeout(timer2);
       window.removeEventListener('resize', calculatePages);
     };
-  }, [isOpen, faqs.length, activeCategory, searchQuery, qrCodeDataUrl]);
+  }, [isOpen, displayedFaqs.length, activeCategory, effectiveSearchQuery, highlightMatchesEnabled, qrCodeDataUrl, Object.keys(faqQrCodes).length, Object.keys(expandedAnswerIds).length]);
 
   // Fixed document metadata for consistent printable output
   const [docMeta] = useState(() => {
@@ -132,7 +323,7 @@ export default function PrintFaqModal({
   // Calculate unique categories, counts, and question number ranges for Daftar Isi
   const exportCategories = React.useMemo(() => {
     const catsMap = new Map<string, { count: number; firstIndex: number }>();
-    faqs.forEach((faq, index) => {
+    displayedFaqs.forEach((faq, index) => {
       const cat = faq.category || 'Umum';
       if (!catsMap.has(cat)) {
         catsMap.set(cat, { count: 1, firstIndex: index + 1 });
@@ -148,7 +339,7 @@ export default function PrintFaqModal({
       lastIndex: data.firstIndex + data.count - 1,
       slug: `faq-cat-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
     }));
-  }, [faqs]);
+  }, [displayedFaqs]);
 
   const bookingWhatsAppUrl = `${CONTACT_INFO.whatsappUrl}?text=${encodeURIComponent('Halo PT Kusuma Gemilang Raya, saya membaca Dokumen Cetak FAQ Resmi dan ingin booking / konsultasi layanan sanitasi.')}`;
 
@@ -167,6 +358,52 @@ export default function PrintFaqModal({
       console.error('Gagal generate QR Code:', err);
     });
   }, [bookingWhatsAppUrl]);
+
+  // Generate QR code for each FAQ item that redirects directly to its specific anchor link
+  useEffect(() => {
+    if (!isOpen || faqs.length === 0) return;
+
+    let isMounted = true;
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://sedotwcbekasi.co.id';
+    const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+    const basePath = pathname === '/' ? '' : pathname;
+
+    Promise.all(
+      faqs.map(async (faq, i) => {
+        const anchorSlug = faq.id || String(i + 1);
+        const targetUrl = `${origin}${basePath}#faq-${anchorSlug}`;
+        const key = String(faq.id || i + 1);
+        try {
+          const qrData = await QRCode.toDataURL(targetUrl, {
+            width: 160,
+            margin: 1,
+            color: {
+              dark: '#0A192F',
+              light: '#FFFFFF'
+            },
+            errorCorrectionLevel: 'M'
+          });
+          return { key, qrData };
+        } catch (err) {
+          console.error(`Gagal generate QR Code untuk FAQ #${i + 1}:`, err);
+          return { key, qrData: '' };
+        }
+      })
+    ).then(results => {
+      if (!isMounted) return;
+      const map: Record<string, string> = {};
+      results.forEach(r => {
+        if (r.qrData) {
+          map[r.key] = r.qrData;
+        }
+      });
+      setFaqQrCodes(map);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, faqs]);
 
   if (!isOpen) return null;
 
@@ -224,6 +461,9 @@ export default function PrintFaqModal({
   // State to track which FAQ item has its Quick Share menu opened
   const [activeShareMenuId, setActiveShareMenuId] = useState<string | null>(null);
   const [copiedShareFaqId, setCopiedShareFaqId] = useState<string | null>(null);
+  // State for Copied! toast notification on individual FAQ question link copy
+  const [copiedLinkFaqId, setCopiedLinkFaqId] = useState<string | null>(null);
+  const [copiedToastMessage, setCopiedToastMessage] = useState<string | null>(null);
 
   // Close share popup on click outside
   useEffect(() => {
@@ -236,6 +476,22 @@ export default function PrintFaqModal({
     window.addEventListener('click', handleOutsideClick);
     return () => window.removeEventListener('click', handleOutsideClick);
   }, []);
+
+  const handleCopyQuestionLink = (e: React.MouseEvent, faq: FaqItem, index: number) => {
+    e.stopPropagation();
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://sedotwcbekasi.co.id';
+    const faqAnchor = `${origin}/#faq-${faq.id || (index + 1)}`;
+    const idKey = String(faq.id || index + 1);
+
+    navigator.clipboard.writeText(faqAnchor).then(() => {
+      setCopiedLinkFaqId(idKey);
+      setCopiedToastMessage(`Tautan FAQ #${index + 1} berhasil disalin!`);
+      setTimeout(() => {
+        setCopiedLinkFaqId(null);
+        setCopiedToastMessage(null);
+      }, 2500);
+    });
+  };
 
   const handleShareWhatsApp = (faq: FaqItem, index: number) => {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://sedotwcbekasi.co.id';
@@ -329,14 +585,16 @@ export default function PrintFaqModal({
               <span>Export CSV</span>
             </button>
 
-            {/* Print Button */}
+            {/* Print FAQ Button */}
             <button
               type="button"
+              id="print-faq-button"
               onClick={handlePrint}
               className="px-4 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#E65F00] text-white text-xs sm:text-sm font-bold flex items-center gap-2 transition-all shadow-md cursor-pointer hover:shadow-orange-500/20"
+              title="Cetak langsung dokumen FAQ atau simpan sebagai PDF A4"
             >
               <Printer className="w-4 h-4" />
-              <span>Cetak Sekarang (Print / PDF)</span>
+              <span>Print FAQ</span>
             </button>
 
             {/* Close Button */}
@@ -351,28 +609,106 @@ export default function PrintFaqModal({
           </div>
         </div>
 
-        {/* Info Banner in Modal Header */}
-        <div className="no-print bg-amber-50 px-5 py-2.5 border-b border-amber-200 flex items-center justify-between text-xs text-amber-900">
+        {/* Info Banner & Search Highlight Controls in Modal Header */}
+        <div className="no-print bg-amber-50 px-4 sm:px-5 py-2.5 border-b border-amber-200 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold">Filter Aktif:</span>
             <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-semibold">
               Kategori: {activeCategory}
             </span>
-            {searchQuery && (
-              <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md">
-                Pencarian: "{searchQuery}"
+            {effectiveSearchQuery && (
+              <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md font-bold border border-amber-300">
+                Pencarian: "{effectiveSearchQuery}"
+              </span>
+            )}
+            {effectiveSearchQuery && (
+              <span 
+                id="faq-search-matches-counter"
+                className="bg-amber-200 text-amber-950 px-2 py-0.5 rounded-md font-extrabold flex items-center gap-1 border border-amber-400"
+                title={`Ditemukan ${totalMatchesCount} kemunculan kata "${effectiveSearchQuery}"`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-800" />
+                <span>{totalMatchesCount} kata disorot</span>
               </span>
             )}
             <span className="text-amber-700">
-              • Menampilkan {faqs.length} dari {totalFaqsCount} FAQ
+              • Menampilkan {displayedFaqs.length} dari {totalFaqsCount} FAQ
             </span>
             <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1">
               <span>📄 Total Dokumen: {totalPages} Halaman (A4)</span>
             </span>
           </div>
-          <span className="hidden sm:inline text-amber-700/80 italic text-[11px]">
-            Tip: Dokumen dilengkapi penomoran halaman dinamis, Stempel Resmi & QR Code.
-          </span>
+
+          {/* Quick In-Modal Search Input & 'Highlight all matches' Toggle */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* In-Modal Search Box */}
+            <div className="relative flex items-center">
+              <Search className="w-3.5 h-3.5 text-amber-700/60 absolute left-2.5 pointer-events-none" />
+              <input
+                type="text"
+                id="faq-modal-search-input"
+                value={inModalSearch}
+                onKeyDown={() => {
+                  playFaqClickSound();
+                }}
+                onChange={(e) => {
+                  playFaqClickSound();
+                  setInModalSearch(e.target.value);
+                }}
+                placeholder={searchQuery ? `Filter: ${searchQuery}` : "Ketik kata kunci untuk disorot..."}
+                className="pl-8 pr-7 py-1 text-xs bg-white border border-amber-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-500 w-44 sm:w-56"
+              />
+              {inModalSearch && (
+                <button
+                  type="button"
+                  onClick={() => setInModalSearch('')}
+                  className="absolute right-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  aria-label="Bersihkan pencarian modal"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* 'Highlight all matches' Toggle Button */}
+            {effectiveSearchQuery && (
+              <button
+                type="button"
+                id="toggle-highlight-matches"
+                onClick={() => setHighlightMatchesEnabled(prev => !prev)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                  highlightMatchesEnabled
+                    ? 'bg-amber-400 hover:bg-amber-500 text-amber-950 border-amber-500 shadow-2xs'
+                    : 'bg-white hover:bg-slate-100 text-slate-600 border-slate-300'
+                }`}
+                title={highlightMatchesEnabled ? 'Sembunyikan sorotan kata kunci' : 'Tampilkan sorotan kata kunci'}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-900" />
+                <span>Highlight all matches: {highlightMatchesEnabled ? 'ON' : 'OFF'}</span>
+              </button>
+            )}
+
+            {/* 'Expand All / Collapse All' Toggle Button */}
+            <button
+              type="button"
+              id="toggle-expand-all-answers-btn"
+              onClick={handleToggleExpandAll}
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+              title="Perluas atau ringkas semua jawaban teks panjang"
+            >
+              {displayedFaqs.some(f => (f.a.length > 180 || f.a.split('\n').length > 2) && expandedAnswerIds[String(f.id || f.q)]) ? (
+                <>
+                  <ChevronUp className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Collapse All</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Expand All</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Printable Document Sheet */}
@@ -452,6 +788,71 @@ export default function PrintFaqModal({
 
             {/* Document Content - relative z-10 for sharp readability over watermark */}
             <div className="relative z-10">
+              {/* TOP 'PRINT FAQ' ACTION BAR INSIDE #faq-printable-area (SCREEN ONLY - HIDDEN WHEN PRINTING) */}
+              <div 
+                id="faq-print-action-bar"
+                className="no-print mb-4 p-3 bg-slate-50/90 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 shadow-2xs"
+              >
+                <div className="flex items-center gap-2 text-xs text-slate-700 font-bold flex-wrap">
+                  <Printer className="w-4 h-4 text-[#00C2CB] shrink-0" />
+                  <span>Format Cetak A4 Resmi • PT Kusuma Gemilang Raya</span>
+                  <span 
+                    id="faq-actionbar-reading-time"
+                    className="inline-flex items-center gap-1 text-[10.5px] font-bold text-sky-900 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200"
+                    title={`Estimated Reading Time: ~${readingTimeStats.minutes} min`}
+                  >
+                    <BookOpen className="w-3 h-3 text-sky-600 shrink-0" />
+                    <span>Estimated Reading Time: ~{readingTimeStats.minutes} min</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  {/* Embedded Quick Search Input inside #faq-printable-area */}
+                  <div className="relative flex items-center">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+                    <input
+                      type="text"
+                      id="faq-printable-search-input"
+                      value={inModalSearch}
+                      onKeyDown={() => {
+                        playFaqClickSound();
+                      }}
+                      onChange={(e) => {
+                        playFaqClickSound();
+                        setInModalSearch(e.target.value);
+                      }}
+                      placeholder="Cari dalam dokumen A4..."
+                      className="pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-300 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#00C2CB] focus:ring-2 focus:ring-[#00C2CB]/20 w-48 sm:w-56 shadow-2xs transition-all"
+                      aria-label="Cari pertanyaan dalam area cetak FAQ"
+                    />
+                    {inModalSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playFaqClickSound();
+                          setInModalSearch('');
+                        }}
+                        className="absolute right-2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 rounded-full"
+                        aria-label="Bersihkan pencarian dokumen"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    id="print-faq-sheet-btn"
+                    onClick={handlePrint}
+                    className="px-4 py-2 rounded-xl bg-[#0A192F] hover:bg-[#172A45] text-white text-xs font-bold flex items-center gap-2 transition-all shadow-md cursor-pointer hover:shadow-cyan-900/20"
+                    title="Cetak dokumen FAQ ini langsung ke printer atau simpan sebagai PDF A4"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-[#00C2CB]" />
+                    <span>Print FAQ</span>
+                  </button>
+                </div>
+              </div>
+
               {/* TOP CENTERED OFFICIAL LOGO OF PT KUSUMA GEMILANG RAYA (OPTIMIZED FOR A4 PRINT) */}
               <div 
                 id="faq-print-official-logo"
@@ -499,6 +900,15 @@ export default function PrintFaqModal({
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse print:hidden" />
                     Live Snapshot Informasi Layanan
                   </span>
+                  <span className="text-slate-300 print:text-slate-400">•</span>
+                  <span 
+                    id="faq-stamp-reading-time"
+                    className="inline-flex items-center gap-1 text-[10.5px] font-bold text-sky-900 print:text-black bg-sky-50 print:bg-slate-100 px-2 py-0.5 rounded-full border border-sky-200 print:border-slate-300"
+                    title={`Estimated Reading Time: ~${readingTimeStats.minutes} min (${readingTimeStats.totalWords} words)`}
+                  >
+                    <BookOpen className="w-3 h-3 text-sky-600 print:text-black shrink-0" />
+                    <span>Estimated Reading Time: ~{readingTimeStats.minutes} min</span>
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500 print:text-slate-600">
                   <span className="hidden sm:inline">REF:</span>
@@ -527,6 +937,22 @@ export default function PrintFaqModal({
                       </span>
                       <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300 print:border print:border-emerald-700">
                         LEGAL & RESMI IPLT
+                      </span>
+                      {/* Small 'Estimated Reading Time' Badge */}
+                      <span
+                        id="faq-estimated-reading-time-badge"
+                        data-testid="estimated-reading-time-badge"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-sky-50 text-sky-900 border border-sky-300 print:bg-slate-100 print:text-black print:border-slate-500 shadow-2xs"
+                        title={`Estimated Reading Time: ~${readingTimeStats.minutes} menit (dihitung dari ${readingTimeStats.totalWords} kata dalam ${displayedFaqs.length} FAQ)`}
+                      >
+                        <BookOpen className="w-3.5 h-3.5 text-sky-600 print:text-black shrink-0" />
+                        <span className="font-extrabold text-sky-950 print:text-black">Estimated Reading Time:</span>
+                        <span className="font-black text-sky-900 print:text-black bg-sky-200/60 print:bg-transparent px-1.5 py-0.2 rounded">
+                          ~{readingTimeStats.minutes} {readingTimeStats.minutes === 1 ? 'min' : 'mins'}
+                        </span>
+                        <span className="text-sky-600/80 print:text-slate-500 font-normal text-[9.5px]">
+                          ({readingTimeStats.totalWords} words)
+                        </span>
                       </span>
                     </div>
                     <p className="text-xs text-slate-700 font-bold mt-1">
@@ -684,8 +1110,17 @@ export default function PrintFaqModal({
                       <span>Kategori Filter</span>
                     </div>
                     <div className="font-bold text-slate-800 text-[11px] leading-snug truncate" title={activeCategory}>
-                      {activeCategory} ({faqs.length} FAQ)
+                      {activeCategory} ({displayedFaqs.length} FAQ)
                     </div>
+                    <div className="text-[9.5px] text-sky-800 font-semibold print:text-black flex items-center gap-1 mt-0.5">
+                      <BookOpen className="w-2.5 h-2.5 text-sky-600 print:text-black shrink-0" />
+                      <span>Est. Waktu Baca: ~{readingTimeStats.minutes} mnt ({readingTimeStats.totalWords} kata)</span>
+                    </div>
+                    {effectiveSearchQuery && (
+                      <div className="text-[9.5px] text-amber-800 font-semibold print:text-black">
+                        Sorotan: "{effectiveSearchQuery}" ({totalMatchesCount} kata)
+                      </div>
+                    )}
                   </div>
 
                   {/* Field 4: Status Keabsahan */}
@@ -820,7 +1255,7 @@ export default function PrintFaqModal({
                   * Klik kategori untuk melompat otomatis ke bagian pembahasan pada pratinjau digital / cetak.
                 </span>
                 <span className="font-semibold text-slate-700">
-                  Total Tercetak: {faqs.length} FAQ
+                  Total Tercetak: {displayedFaqs.length} FAQ
                 </span>
               </div>
             </div>
@@ -859,10 +1294,230 @@ export default function PrintFaqModal({
               </div>
             </div>
 
+            {/* SECTION: SERVICE COVERAGE STATS (DYNAMIC BASED ON FILTERED FAQS) */}
+            <section
+              id="faq-service-coverage-section"
+              className="mb-6 p-4 sm:p-5 rounded-2xl bg-[#0A192F] text-white print:bg-white print:text-black border-2 border-[#00C2CB] print:border-slate-800 shadow-sm break-inside-avoid print:break-inside-avoid relative overflow-hidden"
+            >
+              {/* Top Accent Strip */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-3.5 border-b border-slate-700/80 print:border-slate-300">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-[#00C2CB]/20 print:bg-slate-100 border border-[#00C2CB] print:border-black flex items-center justify-center shrink-0">
+                    <MapPin className="w-5 h-5 text-[#00C2CB] print:text-black" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-black text-sm sm:text-base text-white print:text-black uppercase tracking-wide flex items-center gap-1.5">
+                        Statistik Cakupan Layanan (Service Coverage Stats)
+                      </h3>
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 print:bg-slate-200 print:text-black print:border print:border-black">
+                        {coverageStats.scopeMode === 'full' ? '100% SIAGA PENUH' : 'FOKUS WILAYAH TERPILIH'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 print:text-slate-600 mt-0.5">
+                      Jangkauan Operasional Resmi Armada Tangki & Layanan Sanitasi PT Kusuma Gemilang Raya se-Bekasi
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-[10px] font-mono text-slate-300 print:text-slate-700">
+                  <span className="bg-white/10 print:bg-slate-100 px-2.5 py-1 rounded-md border border-white/10 print:border-slate-300 font-bold">
+                    SLA Respon: 30–45 Menit
+                  </span>
+                  <span className="bg-white/10 print:bg-slate-100 px-2.5 py-1 rounded-md border border-white/10 print:border-slate-300 font-bold">
+                    Siaga: 24 Jam Non-Stop
+                  </span>
+                </div>
+              </div>
+
+              {/* Dynamic 4 Metric Cards Grid */}
+              <div 
+                id="faq-service-coverage-stats"
+                className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4 text-xs"
+              >
+                {/* Metric 1: Total Kecamatan Terjangkau */}
+                <div className="p-3 rounded-xl bg-white/5 print:bg-slate-50 border border-white/10 print:border-slate-300">
+                  <div className="flex items-center justify-between gap-1 text-[10px] text-cyan-300 print:text-slate-600 uppercase font-extrabold">
+                    <span>Total Kecamatan</span>
+                    <Layers className="w-3.5 h-3.5 text-cyan-400 print:text-slate-700 shrink-0" />
+                  </div>
+                  <div className="mt-1 font-black text-xl text-white print:text-black">
+                    {coverageStats.totalCovered} <span className="text-xs font-normal text-slate-400 print:text-slate-600">/ {coverageStats.totalAll}</span>
+                  </div>
+                  <div className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold mt-0.5">
+                    {coverageStats.coveragePercentage}% Area Terlayani
+                  </div>
+                </div>
+
+                {/* Metric 2: Kota Bekasi */}
+                <div className="p-3 rounded-xl bg-white/5 print:bg-slate-50 border border-white/10 print:border-slate-300">
+                  <div className="flex items-center justify-between gap-1 text-[10px] text-amber-300 print:text-slate-600 uppercase font-extrabold">
+                    <span>Kota Bekasi</span>
+                    <Building className="w-3.5 h-3.5 text-amber-400 print:text-slate-700 shrink-0" />
+                  </div>
+                  <div className="mt-1 font-black text-xl text-white print:text-black">
+                    {coverageStats.coveredKotaCount} <span className="text-xs font-normal text-slate-400 print:text-slate-600">/ {coverageStats.totalKota}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-300 print:text-slate-600 font-medium mt-0.5">
+                    12 Kecamatan Perkotaan
+                  </div>
+                </div>
+
+                {/* Metric 3: Kabupaten Bekasi */}
+                <div className="p-3 rounded-xl bg-white/5 print:bg-slate-50 border border-white/10 print:border-slate-300">
+                  <div className="flex items-center justify-between gap-1 text-[10px] text-emerald-300 print:text-slate-600 uppercase font-extrabold">
+                    <span>Kab. Bekasi</span>
+                    <Target className="w-3.5 h-3.5 text-emerald-400 print:text-slate-700 shrink-0" />
+                  </div>
+                  <div className="mt-1 font-black text-xl text-white print:text-black">
+                    {coverageStats.coveredKabCount} <span className="text-xs font-normal text-slate-400 print:text-slate-600">/ {coverageStats.totalKab}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-300 print:text-slate-600 font-medium mt-0.5">
+                    23 Kec. & Kawasan Industri
+                  </div>
+                </div>
+
+                {/* Metric 4: Kesiapan Armada & Standar APD */}
+                <div className="p-3 rounded-xl bg-white/5 print:bg-slate-50 border border-white/10 print:border-slate-300">
+                  <div className="flex items-center justify-between gap-1 text-[10px] text-emerald-300 print:text-slate-600 uppercase font-extrabold">
+                    <span>Armada & K3</span>
+                    <Truck className="w-3.5 h-3.5 text-emerald-400 print:text-slate-700 shrink-0" />
+                  </div>
+                  <div className="mt-1 font-black text-xl text-white print:text-black">
+                    15+ <span className="text-xs font-normal text-slate-400 print:text-slate-600">Unit Truk</span>
+                  </div>
+                  <div className="text-[10px] text-emerald-400 print:text-emerald-700 font-bold mt-0.5">
+                    Tangki Vakum 3-5 m³
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Progress / Coverage Meter Bar */}
+              <div 
+                id="faq-coverage-meter-bar"
+                className="mb-4 p-3 rounded-xl bg-white/5 print:bg-slate-50 border border-white/10 print:border-slate-300"
+              >
+                <div className="flex items-center justify-between text-xs mb-1.5 font-bold">
+                  <span className="flex items-center gap-1.5 text-slate-200 print:text-slate-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#00C2CB] print:text-black" />
+                    <span>Tingkat Keterjangkauan Wilayah Operasional:</span>
+                    <span className="text-emerald-400 print:text-black font-extrabold">{coverageStats.coveragePercentage}%</span>
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400 print:text-slate-600">
+                    {coverageStats.totalCovered} dari 35 Kecamatan Aktif
+                  </span>
+                </div>
+                
+                {/* Visual Progress Bar */}
+                <div className="w-full h-3 bg-slate-800 print:bg-slate-200 rounded-full overflow-hidden p-0.5 border border-slate-700 print:border-slate-400">
+                  <div 
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-[#00C2CB] to-cyan-400 print:bg-black transition-all duration-500"
+                    style={{ width: `${Math.max(5, coverageStats.coveragePercentage)}%` }}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between text-[10px] text-slate-400 print:text-slate-600 mt-1.5">
+                  <span>Kota Bekasi (12 Kec) • Kab. Bekasi (23 Kec)</span>
+                  <span>Disetujui untuk Klien Korporat, Residensial & Fasilitas Publik</span>
+                </div>
+              </div>
+
+              {/* District Distribution Badges List (Kota & Kab. Bekasi) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs mb-3">
+                {/* Column 1: Kota Bekasi */}
+                <div 
+                  id="faq-coverage-kota-grid"
+                  className="p-3 rounded-xl bg-white/5 print:bg-white border border-white/10 print:border-slate-300"
+                >
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 print:border-slate-200">
+                    <span className="font-extrabold text-[11px] uppercase tracking-wider text-amber-300 print:text-slate-900 flex items-center gap-1.5">
+                      <Building className="w-3.5 h-3.5 text-amber-400 print:text-black" />
+                      Kota Bekasi ({coverageStats.coveredKotaCount}/{coverageStats.totalKota} Kecamatan)
+                    </span>
+                    <span className="text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 print:bg-slate-100 print:text-black px-1.5 py-0.5 rounded">
+                      Cakupan Penuh
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {KOTA_BEKASI.map((district) => {
+                      const isMatched = coverageStats.matchedKota.includes(district);
+                      return (
+                        <span
+                          key={district}
+                          className={`inline-flex items-center gap-1 text-[9.5px] px-2 py-0.8 rounded-md font-semibold transition-colors ${
+                            isMatched
+                              ? 'bg-amber-400 text-slate-950 print:bg-slate-200 print:text-black print:border print:border-black font-extrabold shadow-2xs'
+                              : 'bg-white/10 text-slate-200 print:bg-slate-100 print:text-slate-800 print:border print:border-slate-200'
+                          }`}
+                        >
+                          <Check className="w-2.5 h-2.5 shrink-0 text-emerald-400 print:text-black" />
+                          <span>{district}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Column 2: Kabupaten Bekasi */}
+                <div 
+                  id="faq-coverage-kab-grid"
+                  className="p-3 rounded-xl bg-white/5 print:bg-white border border-white/10 print:border-slate-300"
+                >
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 print:border-slate-200">
+                    <span className="font-extrabold text-[11px] uppercase tracking-wider text-emerald-300 print:text-slate-900 flex items-center gap-1.5">
+                      <Target className="w-3.5 h-3.5 text-emerald-400 print:text-black" />
+                      Kabupaten Bekasi ({coverageStats.coveredKabCount}/{coverageStats.totalKab} Kecamatan)
+                    </span>
+                    <span className="text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 print:bg-slate-100 print:text-black px-1.5 py-0.5 rounded">
+                      Cakupan Penuh
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 max-h-[140px] overflow-y-auto print:max-h-none print:overflow-visible pr-0.5">
+                    {KAB_BEKASI.map((district) => {
+                      const isMatched = coverageStats.matchedKab.includes(district);
+                      return (
+                        <span
+                          key={district}
+                          className={`inline-flex items-center gap-1 text-[9.5px] px-2 py-0.8 rounded-md font-semibold transition-colors ${
+                            isMatched
+                              ? 'bg-emerald-400 text-slate-950 print:bg-slate-200 print:text-black print:border print:border-black font-extrabold shadow-2xs'
+                              : 'bg-white/10 text-slate-200 print:bg-slate-100 print:text-slate-800 print:border print:border-slate-200'
+                          }`}
+                        >
+                          <Check className="w-2.5 h-2.5 shrink-0 text-emerald-400 print:text-black" />
+                          <span>{district}</span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Corporate Industrial Zone Endorsement & Compliance Statement */}
+              <div className="p-3 rounded-xl bg-white/5 print:bg-slate-50 border border-white/10 print:border-slate-300 text-[10.5px] leading-relaxed">
+                <div className="flex items-center gap-1.5 text-cyan-300 print:text-slate-900 font-bold mb-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400 print:text-slate-900 shrink-0" />
+                  <span className="uppercase tracking-wider">Kawasan Industri & Bisnis Tercover Prioritas:</span>
+                </div>
+                <p className="text-slate-300 print:text-slate-700">
+                  Kawasan Industri MM2100 (Cibitung), Jababeka I–VI (Cikarang), EJIP (Cikarang Selatan), GIIC Kota Deltamas, Delta Silicon Industrial Park, BIIE Hyundai, & Marunda Center (Tarumajaya).
+                </p>
+                <div className="mt-2 pt-2 border-t border-white/10 print:border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-400 print:text-slate-600 font-medium">
+                  <span className="flex items-center gap-1 text-emerald-400 print:text-emerald-800 font-bold">
+                    <BadgeCheck className="w-3 h-3 shrink-0" />
+                    Dokumen Manifest & Berita Acara IPLT Resmi Siap untuk Audit ISO 14001 / PROPER
+                  </span>
+                  <span className="font-mono text-slate-300 print:text-slate-700">
+                    KBLI 37011 • NIB: 3701100028193
+                  </span>
+                </div>
+              </div>
+            </section>
+
             {/* Judul Isi Dokumen */}
             <div className="mb-6">
               <h2 className="text-lg sm:text-xl font-black text-[#0A192F]">
-                Daftar Tanya Jawab Resmi ({faqs.length} Pertanyaan)
+                Daftar Tanya Jawab Resmi ({displayedFaqs.length} Pertanyaan)
               </h2>
               <p className="text-xs text-slate-500 mt-1">
                 Panduan teknis dan informasi standar layanan sanitasi untuk hunian tinggal, kawasan komersial, dan fasilitas industri di wilayah Bekasi.
@@ -871,9 +1526,9 @@ export default function PrintFaqModal({
 
             {/* List Pertanyaan & Jawaban */}
             <div className="space-y-6">
-              {faqs.map((faq, index) => {
+              {displayedFaqs.map((faq, index) => {
                 const catSlug = `faq-cat-${(faq.category || 'Umum').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-                const isFirstOfCategory = index === 0 || (faqs[index - 1].category || 'Umum') !== (faq.category || 'Umum');
+                const isFirstOfCategory = index === 0 || (displayedFaqs[index - 1].category || 'Umum') !== (faq.category || 'Umum');
                 const catIndex = exportCategories.findIndex(c => c.slug === catSlug);
 
                 return (
@@ -896,7 +1551,9 @@ export default function PrintFaqModal({
 
                     <div 
                       id={`faq-item-${index + 1}`}
-                      className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 break-inside-avoid print:bg-white print:border-slate-300 shadow-2xs print:shadow-none relative"
+                      key={`faq-item-${faq.id || index}-${effectiveSearchQuery}-${activeCategory}-${highlightMatchesEnabled ? 'hl' : 'plain'}`}
+                      style={{ animationDelay: `${index * 50}ms` }}
+                      className="faq-stagger-fade-in faq-printable-item-animate p-4 rounded-xl border border-slate-200 bg-slate-50/50 break-inside-avoid print:bg-white print:border-slate-300 shadow-2xs print:shadow-none relative transition-all duration-300"
                     >
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex items-start gap-2.5 flex-1">
@@ -922,97 +1579,254 @@ export default function PrintFaqModal({
                               )}
                             </div>
                             <h4 className="font-bold text-sm text-[#0A192F] leading-snug">
-                              {faq.q}
+                              {highlightMatches(faq.q, effectiveSearchQuery)}
                             </h4>
                           </div>
                         </div>
 
-                        {/* Quick Share Action Button next to FAQ Header (Screen Only - hidden when printing) */}
-                        <div className="relative shrink-0 no-print faq-share-container">
+                        {/* FAQ Header Actions: Copy Question Link & Quick Share (Screen Only - hidden when printing) */}
+                        <div className="flex items-center gap-1.5 shrink-0 no-print">
+                          {/* Copy Question Link Button */}
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const itemKey = String(faq.id || index + 1);
-                              setActiveShareMenuId(activeShareMenuId === itemKey ? null : itemKey);
-                            }}
+                            id={`faq-copy-btn-${index + 1}`}
+                            onClick={(e) => handleCopyQuestionLink(e, faq, index)}
                             className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold ${
-                              activeShareMenuId === String(faq.id || index + 1)
-                                ? 'bg-[#00C2CB] text-[#0A192F] border-[#00C2CB] shadow-xs'
+                              copiedLinkFaqId === String(faq.id || index + 1)
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-xs ring-2 ring-emerald-400/30'
                                 : 'bg-white text-slate-600 hover:text-[#0A192F] hover:bg-slate-100 border-slate-200'
                             }`}
-                            title="Bagikan pertanyaan ini ke WhatsApp, Twitter, atau Email"
-                            aria-label={`Bagikan pertanyaan ${faq.q}`}
+                            title="Salin tautan pertanyaan ini ke clipboard"
+                            aria-label={`Salin tautan pertanyaan ${faq.q}`}
                           >
-                            <Share2 className="w-3.5 h-3.5 text-[#00C2CB] group-hover:scale-110" />
-                            <span className="hidden sm:inline text-[11px]">Bagikan</span>
+                            {copiedLinkFaqId === String(faq.id || index + 1) ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span className="text-[11px] font-bold text-emerald-700">Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5 text-[#00C2CB] group-hover:scale-110 shrink-0" />
+                                <span className="hidden sm:inline text-[11px]">Copy</span>
+                              </>
+                            )}
                           </button>
 
-                          {/* Quick Share Flyout Menu */}
-                          {activeShareMenuId === String(faq.id || index + 1) && (
-                            <div 
-                              className="absolute right-0 top-full mt-1.5 z-30 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-2 text-xs animate-fadeIn"
-                              onClick={(e) => e.stopPropagation()}
+                          {/* Quick Share Action Button next to FAQ Header */}
+                          <div className="relative shrink-0 faq-share-container">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const itemKey = String(faq.id || index + 1);
+                                setActiveShareMenuId(activeShareMenuId === itemKey ? null : itemKey);
+                              }}
+                              className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold ${
+                                activeShareMenuId === String(faq.id || index + 1)
+                                  ? 'bg-[#00C2CB] text-[#0A192F] border-[#00C2CB] shadow-xs'
+                                  : 'bg-white text-slate-600 hover:text-[#0A192F] hover:bg-slate-100 border-slate-200'
+                              }`}
+                              title="Bagikan pertanyaan ini ke WhatsApp, Twitter, atau Email"
+                              aria-label={`Bagikan pertanyaan ${faq.q}`}
                             >
-                              <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
-                                Bagikan Tanya Jawab
+                              <Share2 className="w-3.5 h-3.5 text-[#00C2CB] group-hover:scale-110" />
+                              <span className="hidden sm:inline text-[11px]">Bagikan</span>
+                            </button>
+
+                            {/* Quick Share Flyout Menu */}
+                            {activeShareMenuId === String(faq.id || index + 1) && (
+                              <div 
+                                className="absolute right-0 top-full mt-1.5 z-30 w-52 bg-white rounded-xl shadow-xl border border-slate-200 p-2 text-xs animate-fadeIn"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
+                                  Bagikan Tanya Jawab
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareWhatsApp(faq, index)}
+                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 transition-colors cursor-pointer text-left font-medium"
+                                >
+                                  <span className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                  </span>
+                                  <span>Kirim ke WhatsApp</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareTwitter(faq, index)}
+                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-sky-50 text-slate-700 hover:text-sky-800 transition-colors cursor-pointer text-left font-medium"
+                                >
+                                  <span className="w-6 h-6 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+                                    <Twitter className="w-3.5 h-3.5" />
+                                  </span>
+                                  <span>Bagikan ke Twitter / X</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareEmail(faq, index)}
+                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-indigo-50 text-slate-700 hover:text-indigo-800 transition-colors cursor-pointer text-left font-medium"
+                                >
+                                  <span className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                                    <Mail className="w-3.5 h-3.5" />
+                                  </span>
+                                  <span>Kirim via Email</span>
+                                </button>
+                                <div className="border-t border-slate-100 my-1" />
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyFaqDirectText(faq, index)}
+                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer text-left font-medium"
+                                >
+                                  <span className="w-6 h-6 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                                    {copiedShareFaqId === String(faq.id || index + 1) ? (
+                                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                    ) : (
+                                      <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                  </span>
+                                  <span>
+                                    {copiedShareFaqId === String(faq.id || index + 1)
+                                      ? 'Tersalin ke Clipboard!'
+                                      : 'Salin Teks FAQ'}
+                                  </span>
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => handleShareWhatsApp(faq, index)}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 transition-colors cursor-pointer text-left font-medium"
-                              >
-                                <span className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                                  <MessageCircle className="w-3.5 h-3.5" />
-                                </span>
-                                <span>Kirim ke WhatsApp</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleShareTwitter(faq, index)}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-sky-50 text-slate-700 hover:text-sky-800 transition-colors cursor-pointer text-left font-medium"
-                              >
-                                <span className="w-6 h-6 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
-                                  <Twitter className="w-3.5 h-3.5" />
-                                </span>
-                                <span>Bagikan ke Twitter / X</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleShareEmail(faq, index)}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-indigo-50 text-slate-700 hover:text-indigo-800 transition-colors cursor-pointer text-left font-medium"
-                              >
-                                <span className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-                                  <Mail className="w-3.5 h-3.5" />
-                                </span>
-                                <span>Kirim via Email</span>
-                              </button>
-                              <div className="border-t border-slate-100 my-1" />
-                              <button
-                                type="button"
-                                onClick={() => handleCopyFaqDirectText(faq, index)}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer text-left font-medium"
-                              >
-                                <span className="w-6 h-6 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
-                                  {copiedShareFaqId === String(faq.id || index + 1) ? (
-                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                  ) : (
-                                    <Copy className="w-3.5 h-3.5" />
-                                  )}
-                                </span>
-                                <span>
-                                  {copiedShareFaqId === String(faq.id || index + 1)
-                                    ? 'Tersalin ke Clipboard!'
-                                    : 'Salin Teks FAQ'}
-                                </span>
-                              </button>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       <div className="pl-8 text-xs text-slate-700 leading-relaxed">
-                        <p className="whitespace-pre-line">{faq.a}</p>
+                        {(() => {
+                          const itemKey = String(faq.id || index + 1);
+                          const isLongAnswer = faq.a.length > 180 || faq.a.split('\n').length > 2;
+                          const isExpanded = !!expandedAnswerIds[itemKey];
+
+                          if (!isLongAnswer) {
+                            return (
+                              <p className="whitespace-pre-line">
+                                {highlightMatches(faq.a, effectiveSearchQuery)}
+                              </p>
+                            );
+                          }
+
+                          return (
+                            <div>
+                              <div className="relative">
+                                <p 
+                                  id={`faq-answer-text-${index + 1}`}
+                                  className={`whitespace-pre-line print:line-clamp-none transition-all duration-200 ${
+                                    isExpanded ? 'line-clamp-none' : 'line-clamp-3'
+                                  }`}
+                                >
+                                  {highlightMatches(faq.a, effectiveSearchQuery)}
+                                </p>
+                                {!isExpanded && (
+                                  <div 
+                                    aria-hidden="true"
+                                    className="no-print absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-slate-50/90 to-transparent pointer-events-none" 
+                                  />
+                                )}
+                              </div>
+
+                              {/* 'Read More' Toggle Button for Questions with Long-form Content */}
+                              <button
+                                type="button"
+                                id={`faq-read-more-btn-${index + 1}`}
+                                onClick={() => toggleAnswerExpand(itemKey)}
+                                className={`no-print mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
+                                  isExpanded
+                                    ? 'bg-slate-200/70 hover:bg-slate-300 text-slate-700 border-slate-300'
+                                    : 'bg-cyan-50 hover:bg-cyan-100 text-[#00838F] hover:text-[#0A192F] border-cyan-200 shadow-2xs'
+                                }`}
+                                aria-expanded={isExpanded}
+                                aria-controls={`faq-answer-text-${index + 1}`}
+                                title={isExpanded ? 'Ringkas jawaban' : 'Baca jawaban lengkap'}
+                              >
+                                <span>{isExpanded ? 'Tutup / Show Less' : 'Read More (Baca Selengkapnya)'}</span>
+                                {isExpanded ? (
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Direct Mobile Anchor QR Code Display for easy scanning & mobile sharing */}
+                        {(() => {
+                          const itemKey = String(faq.id || index + 1);
+                          const anchorSlug = faq.id || String(index + 1);
+                          const qrSrc = faqQrCodes[itemKey];
+
+                          return (
+                            <div 
+                              id={`faq-item-qr-section-${index + 1}`}
+                              className="mt-3 pt-2.5 border-t border-slate-200/90 print:border-slate-300 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 bg-white print:bg-white p-2.5 rounded-xl border border-slate-200 print:border-slate-400 shadow-2xs print:shadow-none break-inside-avoid print:break-inside-avoid"
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                {/* QR Code Graphic Box */}
+                                <div 
+                                  id={`faq-item-qr-box-${index + 1}`}
+                                  className="shrink-0 bg-white p-1 rounded-lg border border-slate-300 print:border-slate-500 shadow-2xs print:shadow-none flex flex-col items-center justify-center"
+                                >
+                                  {qrSrc ? (
+                                    <img 
+                                      src={qrSrc} 
+                                      alt={`QR Code FAQ #${index + 1}`}
+                                      className="w-12 h-12 sm:w-14 sm:h-14 object-contain print:w-11 print:h-11"
+                                      id={`faq-qr-img-${index + 1}`}
+                                    />
+                                  ) : (
+                                    <div className="w-12 h-12 sm:w-14 sm:h-14 bg-slate-50 flex items-center justify-center text-slate-400">
+                                      <QrCodeIcon className="w-6 h-6 animate-pulse" />
+                                    </div>
+                                  )}
+                                  <span className="text-[7px] font-black tracking-widest text-[#0A192F] uppercase mt-0.5 print:text-black">
+                                    SCAN FAQ
+                                  </span>
+                                </div>
+
+                                {/* QR Info and Direct Anchor Details */}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 text-[#0A192F] font-bold text-[11px] leading-tight">
+                                    <Scan className="w-3.5 h-3.5 text-[#00C2CB] print:text-slate-800 shrink-0" />
+                                    <span>Pindai QR untuk Tautan Langsung di HP</span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 print:text-slate-700 leading-snug mt-0.5">
+                                    Arahkan kamera HP ke QR Code untuk langsung membuka dan membagikan jawaban pertanyaan ini.
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                    <span className="font-mono text-[9px] text-slate-600 print:text-slate-800 bg-slate-100 print:bg-slate-50 px-2 py-0.5 rounded border border-slate-200 print:border-slate-300 truncate max-w-[260px]">
+                                      #faq-{anchorSlug}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleCopyQuestionLink(e, faq, index)}
+                                      className="no-print inline-flex items-center gap-1 text-[10px] font-semibold text-[#00C2CB] hover:text-[#0A192F] transition-colors cursor-pointer"
+                                      title="Salin tautan langsung"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      <span>Salin Tautan</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Mobile sharing indicator */}
+                              <div className="shrink-0 hidden sm:flex flex-col items-end text-right pl-2">
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 print:border-slate-400 print:bg-white print:text-slate-800">
+                                  Mobile Deep-Link
+                                </span>
+                                <span className="text-[8.5px] text-slate-400 print:text-slate-600 mt-0.5">
+                                  Langsung Buka Jawaban #{index + 1}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1427,6 +2241,27 @@ export default function PrintFaqModal({
                 <span>{totalPages}</span>
               </div>
             </footer>
+
+            {/* VISUAL 'COPIED!' TOAST NOTIFICATION FOR FAQ QUESTION LINK */}
+            {copiedToastMessage && (
+              <div 
+                id="faq-copied-toast"
+                role="status"
+                aria-live="polite"
+                className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-[#0A192F] text-white rounded-2xl shadow-2xl border-2 border-emerald-400 no-print backdrop-blur-md transition-all duration-300"
+              >
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 shadow-inner">
+                  <Check className="w-4 h-4 stroke-[3]" />
+                </div>
+                <div className="pr-1 text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black uppercase tracking-wider text-emerald-400">Copied!</span>
+                    <span className="text-[10px] bg-emerald-950/80 text-emerald-300 font-mono px-1.5 py-0.5 rounded border border-emerald-500/30">Tautan FAQ Tersalin</span>
+                  </div>
+                  <p className="text-xs text-slate-200 font-medium mt-0.5">{copiedToastMessage}</p>
+                </div>
+              </div>
+            )}
             </div>
           </div>
         </div>
@@ -1458,11 +2293,12 @@ export default function PrintFaqModal({
             </button>
             <button
               type="button"
+              id="print-faq-footer-btn"
               onClick={handlePrint}
               className="px-4 py-2 rounded-xl bg-[#0A192F] hover:bg-[#172A45] text-white font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
             >
               <Printer className="w-3.5 h-3.5 text-[#00C2CB]" />
-              <span>Cetak Dokumen</span>
+              <span>Print FAQ</span>
             </button>
           </div>
         </div>

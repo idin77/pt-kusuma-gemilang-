@@ -25,9 +25,74 @@
   }
 }
 
-.wa-pulse {
-  animation: pulseGlow 2s infinite;
+@keyframes faqItemFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
+.faq-printable-item-animate,
+.faq-stagger-fade-in,
+#faq-printable-area .faq-stagger-fade-in {
+  animation: faqItemFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}
+
+@media print {
+  .faq-printable-item-animate,
+  .faq-stagger-fade-in,
+  #faq-printable-area .faq-stagger-fade-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Ensure long-form answer text expands fully on printed documents */
+  #faq-printable-area .line-clamp-1,
+  #faq-printable-area .line-clamp-2,
+  #faq-printable-area .line-clamp-3,
+  #faq-printable-area .line-clamp-4,
+  #faq-printable-area .line-clamp-5,
+  #faq-printable-area .line-clamp-6,
+  #faq-printable-area [class*="line-clamp-"] {
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
+/* Distinct Search Highlight for FAQ matches within #faq-printable-area */
+#faq-printable-area mark.faq-search-highlight,
+#faq-printable-area .faq-search-highlight {
+  background-color: #fef08a !important; /* Distinct bright amber/yellow highlight */
+  color: #451a03 !important; /* High-contrast readable dark amber text */
+  padding: 0.1rem 0.25rem !important;
+  border-radius: 0.25rem !important;
+  font-weight: 800 !important;
+  border: 1px solid #fde047 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+@media print {
+  #faq-printable-area mark.faq-search-highlight,
+  #faq-printable-area .faq-search-highlight {
+    background-color: #fef9c3 !important; /* Crisp, distinct highlight for physical A4 printing */
+    color: #000000 !important;
+    border: 1px solid #ca8a04 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
 
 /* Leaflet Custom Map Styles */
 .leaflet-popup-content-wrapper {
