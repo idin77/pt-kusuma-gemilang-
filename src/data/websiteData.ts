@@ -216,7 +216,7 @@ export const FAQS: FaqItem[] = [
   {
     id: 'harga-biaya-bekasi',
     q: 'Berapa harga sedot WC & limbah di Bekasi?',
-    a: 'Harga layanan kami sangat transparan dihitung per kubik (m³): Limbah Black Water (Tinja) Rp 600.000/kubik (non manifest) & Rp 1.000.000/kubik (manifest), Limbah Grey Water (Lumpur & Lemak) Rp 1.000.000/kubik (non manifest) & Rp 1.400.000/kubik (manifest), serta Cleaning / Blower Lumpur Rp 1.000.000/kubik (non manifest) & Rp 1.400.000/kubik (manifest). Seluruh opsi manifest disertai dokumen resmi IPLT DLH. Anda dapat langsung menggunakan Kalkulator Estimasi Biaya & Booking Cepat di atas untuk menghitung total biaya secara instan.',
+    a: 'Harga layanan kami sangat transparan dihitung per kubik (m³): Limbah Black Water (Tinja) Rp 700.000/kubik (non manifest) & Rp 1.100.000/kubik (manifest), Limbah Grey Water (Lumpur & Lemak) Rp 1.100.000/kubik (non manifest) & Rp 1.500.000/kubik (manifest), serta Cleaning / Blower Lumpur Rp 1.100.000/kubik (non manifest) & Rp 1.500.000/kubik (manifest). Seluruh opsi manifest disertai dokumen resmi IPLT DLH. Anda dapat langsung menggunakan Kalkulator Estimasi Biaya & Booking Cepat di atas untuk menghitung total biaya secara instan.',
     iconName: 'BadgeDollarSign',
     category: 'Harga & Biaya',
     badge: 'Official',
@@ -422,5 +422,180 @@ export const SANITATION_PARTNERS: SanitationPartner[] = [
     credentialNumber: 'Mitra Kawasan Industri & Residensial',
     iconType: 'industry',
     highlight: 'Kontrak Rutin & Panggilan Darurat 24 Jam'
+  }
+];
+
+export interface CorporateClient {
+  id: string;
+  name: string;
+  rawInputName: string;
+  sector: string;
+  category: 'logistics' | 'manufacturing' | 'engineering' | 'food' | 'chemical' | 'heavy_equipment';
+  location: string;
+  serviceScope: string;
+  badgeText: string;
+  featured?: boolean;
+}
+
+export const CORPORATE_CLIENTS: CorporateClient[] = [
+  {
+    id: 'seino-indomobil',
+    name: 'PT. Seino Indomobil Logistics',
+    rawInputName: 'PT. Seino Indomobil Logistics',
+    sector: 'Logistik & Rantai Pasok',
+    category: 'logistics',
+    location: 'Bekasi & Cikarang',
+    serviceScope: 'Penyedotan Septic Tank Gudang & Saluran Logistik',
+    badgeText: 'Mitra Logistik Terverifikasi',
+    featured: true
+  },
+  {
+    id: 'jaya-refrigeration',
+    name: 'PT. Jaya Refrigeration Equipment',
+    rawInputName: 'PT. Jaya Refrigeration Equipment',
+    sector: 'HVAC & Teknik Pendingin Industri',
+    category: 'engineering',
+    location: 'Kawasan Industri Bekasi / Jakarta',
+    serviceScope: 'Kuras Limbah Workshop & Perawatan Saluran Drainase',
+    badgeText: 'Mitra Industri Teknik',
+    featured: true
+  },
+  {
+    id: 'mitsubishi-jaya',
+    name: 'PT. Mitsubishi Jaya Elevator & Escalator',
+    rawInputName: 'PT. Mitsubishi Jaya Elevator & Escalator',
+    sector: 'Elevator, Eskalator & Building Engineering',
+    category: 'engineering',
+    location: 'Jabodetabek & Fasilitas Gedung',
+    serviceScope: 'Sanitasi Gedung Operasional & Pengurasan Berkala',
+    badgeText: 'Mitra Rekayasa Gedung',
+    featured: true
+  },
+  {
+    id: 'maruhide-indonesia',
+    name: 'PT. Maruhide Indonesia',
+    rawInputName: 'PT. Maruhide Indonesia',
+    sector: 'Manufaktur Presisi & Stamping Logam Otomotif',
+    category: 'manufacturing',
+    location: 'Kawasan Industri MM2100, Cikarang',
+    serviceScope: 'Sedot Limbah STP Pabrik & Manifest Pembuangan IPLT',
+    badgeText: 'Klien Manufaktur Presisi',
+    featured: true
+  },
+  {
+    id: 'berjaya-nawaplastics',
+    name: 'PT. Berjaya Nawaplastics Indonesia',
+    rawInputName: 'PT. Berjaya Nawaplastics Indonesia',
+    sector: 'Manufaktur Pipa & Plastik Industri',
+    category: 'manufacturing',
+    location: 'Bekasi',
+    serviceScope: 'Penyedotan Septic Tank Area Pabrik & Grease Trap',
+    badgeText: 'Klien Manufaktur Plastik'
+  },
+  {
+    id: 'triguna-pratama',
+    name: 'PT. Triguna Pratama Abadi',
+    rawInputName: 'PT. Triguna Pratama Abadi',
+    sector: 'Alat Berat, Kontraktor & Trading Teknik',
+    category: 'heavy_equipment',
+    location: 'Bekasi / Jakarta',
+    serviceScope: 'Sanitasi Fasilitas Workshop & Kantor Operasional',
+    badgeText: 'Mitra Kontraktor & Alat Berat'
+  },
+  {
+    id: 'murinda-subang',
+    name: 'PT. Murinda Plant Subang',
+    rawInputName: 'PT. Murinda Plant Subang',
+    sector: 'Fabrikasi Baja & Konstruksi Berat Industri',
+    category: 'manufacturing',
+    location: 'Plant Subang & Lintasan Pantura',
+    serviceScope: 'Pengurasan Limbah Domestik Pabrik Skala Besar',
+    badgeText: 'Klien Pabrikasi Baja',
+    featured: true
+  },
+  {
+    id: 'ipc-tanjung-priok',
+    name: 'PT. IPC Tanjung Priok',
+    rawInputName: 'PT. IPC Tanjung Priok',
+    sector: 'Pelabuhan & Terminal Petikemas Maritim',
+    category: 'logistics',
+    location: 'Pelabuhan Tanjung Priok, Jakarta Utara',
+    serviceScope: 'Sanitasi Area Pelabuhan & Tangki Limbah Kantor Otoritas',
+    badgeText: 'Klien BUMN Pelabuhan',
+    featured: true
+  },
+  {
+    id: 'oscar-mas',
+    name: 'PT. Oscar Mas',
+    rawInputName: 'PT. Oscar Mas',
+    sector: 'Distributor Alat Berat & Mesin Konstruksi',
+    category: 'heavy_equipment',
+    location: 'Bekasi / Jabodetabek',
+    serviceScope: 'Pelancaran Saluran Mampet & Sedot Septic Tank Workshop',
+    badgeText: 'Mitra Distributor Mesin'
+  },
+  {
+    id: 'charoen-pokphand',
+    name: 'PT. Charoen Pokphand Indonesia',
+    rawInputName: 'PT. Charoen Pokphand IIndonesia',
+    sector: 'Agribisnis, Pakan & Pengolahan Pangan Multinasional',
+    category: 'food',
+    location: 'Kawasan Industri Bekasi / Banten',
+    serviceScope: 'Sedot Limbah STP, Grease Trap & Dokumen Manifest IPLT',
+    badgeText: 'Klien Multinasional Pangan',
+    featured: true
+  },
+  {
+    id: 'ogawa-indonesia',
+    name: 'PT. Ogawa Indonesia',
+    rawInputName: 'PT. Ogawa Indonesia',
+    sector: 'Perisa & Wewangian (Flavors & Fragrances)',
+    category: 'chemical',
+    location: 'Kawasan Industri KIIC / Karawang-Bekasi',
+    serviceScope: 'Pengurasan Septic Tank Higienis & SOP Steril K3',
+    badgeText: 'Klien Kimia & Fragrance',
+    featured: true
+  },
+  {
+    id: 'torrecid-indonesia',
+    name: 'PT. Torrecid Indonesia',
+    rawInputName: 'PT. Torrecid Indonesia',
+    sector: 'Kimia & Glasir Keramik Global',
+    category: 'chemical',
+    location: 'Kawasan Industri Cikarang, Bekasi',
+    serviceScope: 'Penyedotan Limbah Domestik Pabrik & Manifest Resmi',
+    badgeText: 'Klien Multinasional Kimia',
+    featured: true
+  },
+  {
+    id: 'hyundai',
+    name: 'PT. Hyundai',
+    rawInputName: 'PT. Hyundai',
+    sector: 'Manufaktur Perakitan Otomotif & Pabrik Mobil',
+    category: 'manufacturing',
+    location: 'Kawasan Industri Deltamas / GIIC, Cikarang',
+    serviceScope: 'Pengurasan Limbah Domestik Kawasan & Armada Tangki Siaga',
+    badgeText: 'Klien Multinasional Otomotif',
+    featured: true
+  },
+  {
+    id: 'classic-fine-foods',
+    name: 'PT. Classic Fine Foods (Clasic Fine Food)',
+    rawInputName: 'PT. Clasic Fine Food',
+    sector: 'Distribusi Bahan Makanan Premium & Cold Chain',
+    category: 'food',
+    location: 'Bekasi / Jakarta',
+    serviceScope: 'Pembersihan Grease Trap Makanan & Sanitasi Higienis',
+    badgeText: 'Klien Distribusi Pangan'
+  },
+  {
+    id: 'sanny-machinery',
+    name: 'PT. Sanny Machinery',
+    rawInputName: 'PT,. Sanny Machinery',
+    sector: 'Mesin Industri & Peralatan Pabrik',
+    category: 'heavy_equipment',
+    location: 'Bekasi',
+    serviceScope: 'Penyedotan Septic Tank & Pelancaran Saluran Fasilitas',
+    badgeText: 'Mitra Mesin Industri'
   }
 ];

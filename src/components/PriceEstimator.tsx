@@ -54,8 +54,8 @@ const SERVICE_CATEGORIES: ServiceCategory[] = [
     badgeBg: 'bg-[#00C2CB]/20',
     badgeText: 'text-[#0A192F]',
     checkBg: 'bg-[#00C2CB]',
-    nonManifestRate: 600000,
-    manifestRate: 1000000,
+    nonManifestRate: 700000,
+    manifestRate: 1100000,
   },
   {
     id: 'grey_water',
@@ -73,8 +73,8 @@ const SERVICE_CATEGORIES: ServiceCategory[] = [
     badgeBg: 'bg-[#FF6B00]/20',
     badgeText: 'text-[#FF6B00]',
     checkBg: 'bg-[#FF6B00]',
-    nonManifestRate: 1000000,
-    manifestRate: 1400000,
+    nonManifestRate: 1100000,
+    manifestRate: 1500000,
   },
   {
     id: 'cleaning_blower',
@@ -92,8 +92,8 @@ const SERVICE_CATEGORIES: ServiceCategory[] = [
     badgeBg: 'bg-[#008c94]/20',
     badgeText: 'text-[#008c94]',
     checkBg: 'bg-[#008c94]',
-    nonManifestRate: 1000000,
-    manifestRate: 1400000,
+    nonManifestRate: 1100000,
+    manifestRate: 1500000,
   },
 ];
 
@@ -107,13 +107,13 @@ export default function PriceEstimator() {
   const [notes, setNotes] = useState('');
 
   // Official updated pricing:
-  // 1. Limbah Black Water (Tinja): Rp 600.000/kubik non manifest | Rp 1.000.000/kubik manifest (+Rp 400.000)
-  // 2. Limbah Grey Water (Lumpur, Lemak): Rp 1.000.000/kubik non manifest | Rp 1.400.000/kubik manifest (+Rp 400.000)
-  // 3. Cleaning / Blower Lumpur: Rp 1.000.000/kubik non manifest | Rp 1.400.000/kubik manifest (+Rp 400.000)
+  // 1. Limbah Black Water (Tinja): Rp 700.000/kubik non manifest | Rp 1.100.000/kubik manifest (+Rp 400.000)
+  // 2. Limbah Grey Water (Lumpur, Lemak): Rp 1.100.000/kubik non manifest | Rp 1.500.000/kubik manifest (+Rp 400.000)
+  // 3. Cleaning / Blower Lumpur: Rp 1.100.000/kubik non manifest | Rp 1.500.000/kubik manifest (+Rp 400.000)
   const baseRatePerCubic = 
     wasteType === 'black_water' 
-      ? 600000 
-      : (wasteType === 'grey_water' ? 1000000 : 1000000);
+      ? 700000 
+      : (wasteType === 'grey_water' ? 1100000 : 1100000);
 
   const manifestFeePerCubic = manifestOption === 'dengan_manifest' ? 400000 : 0;
   const totalRatePerCubic = baseRatePerCubic + manifestFeePerCubic;

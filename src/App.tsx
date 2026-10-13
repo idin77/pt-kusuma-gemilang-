@@ -36,7 +36,10 @@ import {
   Printer,
   FileSpreadsheet,
   Download,
-  BookOpen
+  BookOpen,
+  ArrowUpDown,
+  Info,
+  Layers
 } from 'lucide-react';
 import { 
   CONTACT_INFO, 
@@ -57,15 +60,18 @@ import WorkGallery from './components/WorkGallery';
 import SpecialistSectors from './components/SpecialistSectors';
 import IpltManifestSection from './components/IpltManifestSection';
 import SanitationPartnersBanner from './components/SanitationPartnersBanner';
+import CorporateClientsSection from './components/CorporateClientsSection';
 import MarketingAnalyticsModal from './components/MarketingAnalyticsModal';
 import PrintFaqModal from './components/PrintFaqModal';
 import FaqSocialShare from './components/FaqSocialShare';
 import AutoRedirectModal from './components/AutoRedirectModal';
 import AutoRedirectFloatingWidget from './components/AutoRedirectFloatingWidget';
 import InstantEstimateButton from './components/InstantEstimateButton';
+import { FaqVoiceSearchButton } from './components/FaqVoiceSearchButton';
 import { exportFaqsToCsv } from './utils/exportCsv';
 import { playFaqClickSound } from './utils/soundEffects';
 import { calculateFaqReadingTime } from './utils/readingTime';
+import { useVoiceSearch } from './utils/useVoiceSearch';
 import { initConversionTracking } from './utils/conversionTracker';
 import { 
   detectDevice, 
@@ -78,12 +84,41 @@ import {
   executeAutoRedirect,
   updateActiveContext 
 } from './utils/whatsappRedirect';
+import { motion, type Variants } from 'framer-motion';
+
+// Framer Motion subtle slide-up stagger animation variants for FAQ items
+const faqStaggerContainerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.045,
+      delayChildren: 0.02
+    }
+  }
+};
+
+const faqStaggerItemVariants: Variants = {
+  hidden: { 
+    opacity: 0, 
+    y: 16 
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: {
+      duration: 0.3,
+      ease: 'easeOut'
+    }
+  }
+};
 
 export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeFaq, setActiveFaq] = useState<string | null>(null);
   const [faqSearchQuery, setFaqSearchQuery] = useState<string>('');
   const [faqCategoryFilter, setFaqCategoryFilter] = useState<string>('Semua');
+  const [faqSortOrder, setFaqSortOrder] = useState<'recent' | 'alphabetical'>('recent');
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [showMarketingModal, setShowMarketingModal] = useState(false);
@@ -98,6 +133,35 @@ export default function App() {
   const [autoCountdown, setAutoCountdown] = useState<boolean>(false);
   const [showPrintFaqModal, setShowPrintFaqModal] = useState<boolean>(false);
   const [copiedFaqId, setCopiedFaqId] = useState<string | null>(null);
+
+  // Voice Search integration using Web Speech API for #faq-printable-area search input
+  const landingVoiceSearch = useVoiceSearch({
+    lang: 'id-ID',
+    onTranscriptChange: (text) => {
+      setFaqSearchQuery(text);
+      if (text.trim().length > 1) {
+        const firstMatch = FAQS.find(
+          item => item.q.toLowerCase().includes(text.toLowerCase()) || 
+                  item.a.toLowerCase().includes(text.toLowerCase())
+        );
+        if (firstMatch) {
+          setActiveFaq(firstMatch.q);
+        }
+      }
+    },
+    onFinalTranscript: (text) => {
+      setFaqSearchQuery(text);
+      if (text.trim().length > 1) {
+        const firstMatch = FAQS.find(
+          item => item.q.toLowerCase().includes(text.toLowerCase()) || 
+                  item.a.toLowerCase().includes(text.toLowerCase())
+        );
+        if (firstMatch) {
+          setActiveFaq(firstMatch.q);
+        }
+      }
+    },
+  });
 
   // Deep linking: Dengarkan perubahan hash URL untuk membuka dan scroll ke FAQ tertentu (#faq-harga-biaya-bekasi atau #faq-1)
   useEffect(() => {
@@ -298,10 +362,20 @@ export default function App() {
     return matchesSearch && matchesCategory;
   });
 
+  // Sorted FAQ items based on selected sort order ('recent' or 'alphabetical')
+  const sortedFaqs = React.useMemo(() => {
+    const list = [...filteredFaqs];
+    if (faqSortOrder === 'alphabetical') {
+      list.sort((a, b) => a.q.localeCompare(b.q, 'id', { sensitivity: 'base' }));
+    }
+    // 'recent' maintains curated chronological/priority order
+    return list;
+  }, [filteredFaqs, faqSortOrder]);
+
   // Dynamically calculate estimated reading time based on content length of currently displayed FAQs
   const faqReadingTime = React.useMemo(() => {
-    return calculateFaqReadingTime(filteredFaqs);
-  }, [filteredFaqs]);
+    return calculateFaqReadingTime(sortedFaqs);
+  }, [sortedFaqs]);
 
   const effectiveContext: WhatsAppContext = {
     ...interactionContext,
@@ -374,6 +448,7 @@ export default function App() {
               <li><a href="#manifest-iplt" className="hover:text-[#00C2CB] transition-colors">Manifest IPLT</a></li>
               <li><a href="#galeri" className="hover:text-[#00C2CB] transition-colors">Galeri</a></li>
               <li><a href="#testimoni" className="hover:text-[#00C2CB] transition-colors">Testimoni</a></li>
+              <li><a href="#klien" className="hover:text-[#00C2CB] transition-colors">Klien Rekanan</a></li>
               <li><a href="#faq" className="hover:text-[#00C2CB] transition-colors">FAQ</a></li>
               <li><a href="#kontak" className="hover:text-[#00C2CB] transition-colors">Hubungi Kami</a></li>
             </ul>
@@ -442,6 +517,7 @@ export default function App() {
               <li><a href="#manifest-iplt" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#00C2CB]">Dokumen Manifest IPLT</a></li>
               <li><a href="#galeri" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#00C2CB]">Galeri Foto Lapangan</a></li>
               <li><a href="#testimoni" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#00C2CB]">Testimoni Klien</a></li>
+              <li><a href="#klien" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#00C2CB]">Klien Rekanan (15+ Perusahaan)</a></li>
               <li><a href="#faq" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#00C2CB]">FAQ</a></li>
               <li><a href="#kontak" onClick={() => setMobileMenuOpen(false)} className="block py-1 hover:text-[#00C2CB]">Hubungi Kami</a></li>
             </ul>
@@ -916,11 +992,11 @@ export default function App() {
               <div className="space-y-2 pt-3 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-600">Non Manifest:</span>
-                  <span className="text-base font-black text-[#00C2CB]">Rp 600.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                  <span className="text-base font-black text-[#00C2CB]">Rp 700.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-600">Dengan Manifest:</span>
-                  <span className="text-base font-black text-[#0A192F]">Rp 1.000.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                  <span className="text-base font-black text-[#0A192F]">Rp 1.100.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
                 </div>
               </div>
             </div>
@@ -944,11 +1020,11 @@ export default function App() {
               <div className="space-y-2 pt-3 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-600">Non Manifest:</span>
-                  <span className="text-base font-black text-[#FF6B00]">Rp 1.000.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                  <span className="text-base font-black text-[#FF6B00]">Rp 1.100.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-600">Dengan Manifest:</span>
-                  <span className="text-base font-black text-[#0A192F]">Rp 1.400.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                  <span className="text-base font-black text-[#0A192F]">Rp 1.500.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
                 </div>
               </div>
             </div>
@@ -972,11 +1048,11 @@ export default function App() {
               <div className="space-y-2 pt-3 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-600">Non Manifest:</span>
-                  <span className="text-base font-black text-[#008c94]">Rp 1.000.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                  <span className="text-base font-black text-[#008c94]">Rp 1.100.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-600">Dengan Manifest:</span>
-                  <span className="text-base font-black text-[#0A192F]">Rp 1.400.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
+                  <span className="text-base font-black text-[#0A192F]">Rp 1.500.000 <span className="text-xs font-normal text-slate-500">/ kubik</span></span>
                 </div>
               </div>
             </div>
@@ -1194,6 +1270,9 @@ export default function App() {
       {/* Testimonials Slider Section */}
       <TestimonialSlider />
 
+      {/* Corporate Clients & Industrial Partners Showcase Section */}
+      <CorporateClientsSection />
+
       {/* FAQ Section with Real-Time Search & Category Filters */}
       <section id="faq" className="py-20 bg-[#F8FAFC]">
         <div 
@@ -1244,7 +1323,7 @@ export default function App() {
                   <Printer className="w-4 h-4 text-[#00C2CB] group-hover:scale-110 transition-transform" />
                   <span>Print FAQ</span>
                   <span className="bg-[#00C2CB]/15 text-[#0A192F] font-black text-[11px] px-2 py-0.5 rounded-full">
-                    {filteredFaqs.length} Q&A
+                    {sortedFaqs.length} Q&A
                   </span>
                 </button>
 
@@ -1252,7 +1331,7 @@ export default function App() {
                 <button
                   type="button"
                   id="faq-export-csv-btn"
-                  onClick={() => exportFaqsToCsv(filteredFaqs, {
+                  onClick={() => exportFaqsToCsv(sortedFaqs, {
                     activeCategory: faqCategoryFilter,
                     searchQuery: faqSearchQuery
                   })}
@@ -1262,7 +1341,7 @@ export default function App() {
                   <FileSpreadsheet className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
                   <span>Export to CSV</span>
                   <span className="bg-emerald-100 text-emerald-800 font-black text-[11px] px-2 py-0.5 rounded-full">
-                    CSV ({filteredFaqs.length})
+                    CSV ({sortedFaqs.length})
                   </span>
                 </button>
               </div>
@@ -1309,111 +1388,332 @@ export default function App() {
                     }
                   }}
                   placeholder="Cari pertanyaan... (contoh: tips perawatan, harga, garansi, septic tank mampet, APD, IPLT)"
-                  className="w-full pl-12 pr-12 py-3.5 rounded-2xl bg-white border-2 border-slate-200 text-sm text-[#0A192F] placeholder-slate-400 focus:outline-none focus:border-[#00C2CB] focus:ring-4 focus:ring-[#00C2CB]/15 shadow-sm transition-all"
+                  className={`w-full pl-12 ${
+                    faqSearchQuery ? 'pr-24' : 'pr-14'
+                  } py-3.5 rounded-2xl bg-white border-2 text-sm text-[#0A192F] placeholder-slate-400 focus:outline-none focus:border-[#00C2CB] focus:ring-4 focus:ring-[#00C2CB]/15 shadow-sm transition-all ${
+                    landingVoiceSearch.isListening ? 'border-rose-400 ring-4 ring-rose-200' : 'border-slate-200'
+                  }`}
                   aria-label="Cari pertanyaan FAQ"
                 />
-                {faqSearchQuery && (
+                <div className="absolute right-3.5 flex items-center gap-1.5">
+                  {faqSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playFaqClickSound();
+                        setFaqSearchQuery('');
+                        landingVoiceSearch.resetTranscript();
+                      }}
+                      className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                      title="Hapus pencarian"
+                      aria-label="Hapus kata kunci pencarian"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  <FaqVoiceSearchButton
+                    id="faq-voice-search-btn"
+                    isListening={landingVoiceSearch.isListening}
+                    isSupported={landingVoiceSearch.isSupported}
+                    onToggle={landingVoiceSearch.toggleListening}
+                  />
+                </div>
+              </div>
+
+              {/* Real-time Voice Search Status & Transcription Feedback */}
+              {landingVoiceSearch.isListening && (
+                <div className="mt-2 text-xs text-rose-700 bg-rose-50 border border-rose-200 px-3.5 py-2 rounded-xl flex items-center justify-between animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                    <span className="font-semibold">Mendengarkan... Silakan ucapkan pertanyaan Anda (contoh: "biaya sedot wc", "garansi", "septic tank penuh")</span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setFaqSearchQuery('');
-                    }}
-                    className="absolute right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                    title="Hapus pencarian"
-                    aria-label="Hapus kata kunci pencarian"
+                    onClick={() => landingVoiceSearch.stopListening()}
+                    className="text-rose-600 hover:text-rose-800 font-bold text-xs underline ml-2 cursor-pointer"
                   >
-                    <X className="w-4 h-4" />
+                    Selesai
                   </button>
-                )}
-              </div>
+                </div>
+              )}
+              {landingVoiceSearch.errorMessage && (
+                <div className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3.5 py-2 rounded-xl flex items-center justify-between">
+                  <span>{landingVoiceSearch.errorMessage}</span>
+                  <button
+                    type="button"
+                    onClick={() => landingVoiceSearch.resetTranscript()}
+                    className="text-amber-700 hover:text-amber-900 font-bold text-xs underline ml-2 cursor-pointer"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Quick Category Filter Pills */}
             <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 max-w-3xl mx-auto">
               {[
-                { label: 'Semua', filter: 'Semua' },
-                { label: '💡 Tips Perawatan', filter: 'Tips Perawatan' },
-                { label: 'Harga & Biaya', filter: 'Harga & Biaya' },
-                { label: 'Jaminan Garansi', filter: 'Jaminan Garansi' },
-                { label: 'SOP APD & Keamanan', filter: 'SOP Keamanan (APD)' },
-                { label: 'Cakupan Wilayah', filter: 'Cakupan Wilayah' },
-                { label: 'Manifest & IPLT', filter: 'Legalitas & IPLT' }
+                { label: 'Semua', filter: 'Semua', icon: Layers },
+                { label: 'Tips Perawatan', filter: 'Tips Perawatan', icon: Sparkles, iconColor: 'text-emerald-500' },
+                { label: 'Harga & Biaya', filter: 'Harga & Biaya', icon: Receipt, iconColor: 'text-amber-500' },
+                { label: 'Jaminan Garansi', filter: 'Jaminan Garansi', icon: Award, iconColor: 'text-orange-500' },
+                { label: 'SOP APD & Keamanan', filter: 'SOP Keamanan (APD)', icon: ShieldCheck, iconColor: 'text-emerald-600' },
+                { label: 'Cakupan Wilayah', filter: 'Cakupan Wilayah', icon: MapPin, iconColor: 'text-cyan-600' },
+                { label: 'Manifest & IPLT', filter: 'Legalitas & IPLT', icon: FileCheck, iconColor: 'text-teal-600' }
               ].map((cat, idx) => {
+                const Icon = cat.icon;
                 const isActive = faqCategoryFilter === cat.filter;
                 return (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => {
+                      playFaqClickSound();
                       setFaqCategoryFilter(cat.filter);
                     }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                       isActive
                         ? 'bg-[#0A192F] text-white shadow-sm ring-2 ring-[#00C2CB]'
-                        : 'bg-white text-slate-600 hover:text-[#0A192F] hover:bg-slate-100 border border-slate-200'
+                        : 'bg-white text-slate-600 hover:text-[#0A192F] hover:bg-slate-100 border border-slate-200 shadow-2xs'
                     }`}
                   >
-                    {cat.label}
+                    <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#00C2CB]' : cat.iconColor || 'text-slate-500'}`} />
+                    <span>{cat.label}</span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Filter Active Indicator & Results Counter */}
-            {(faqSearchQuery.trim() || faqCategoryFilter !== 'Semua') && (
-              <div className="flex items-center justify-between max-w-2xl mx-auto px-2 pt-1 text-xs text-slate-500">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span>Menampilkan</span>
-                  <strong className="text-[#0A192F] font-black bg-slate-200/70 px-1.5 py-0.5 rounded">
-                    {filteredFaqs.length}
-                  </strong>
-                  <span>dari {FAQS.length} pertanyaan</span>
-                  {faqSearchQuery && (
-                    <span className="text-slate-600">
-                      untuk "<strong>{faqSearchQuery}</strong>"
-                    </span>
-                  )}
-                  {faqCategoryFilter !== 'Semua' && (
-                    <span className="text-[#00C2CB] font-bold">
-                      • Kategori: {faqCategoryFilter}
-                    </span>
-                  )}
+            {/* Visual Legend Key Explaining What Each Category Icon Represents */}
+            <div 
+              id="faq-category-legend-key"
+              data-testid="faq-category-legend-key"
+              className="mt-3.5 max-w-3xl mx-auto bg-white/95 backdrop-blur-xs rounded-2xl border border-slate-200/90 p-3 sm:p-4 shadow-2xs"
+            >
+              <div className="flex items-center justify-between gap-2 pb-2 mb-2.5 border-b border-slate-100">
+                <div className="flex items-center gap-1.5 text-slate-700">
+                  <Info className="w-3.5 h-3.5 text-[#00C2CB] shrink-0" />
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0A192F]">
+                    Panduan Ikon Kategori Informasi (Visual Legend Key)
+                  </span>
                 </div>
+                <span className="text-[10.5px] text-slate-400 font-medium hidden sm:inline">
+                  Pilih salah satu ikon untuk menyaring FAQ
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                {[
+                  {
+                    id: 'harga',
+                    title: 'Harga & Biaya',
+                    filter: 'Harga & Biaya',
+                    icon: Receipt,
+                    desc: 'Tarif /m³, kalkulator biaya & simulasi manifest',
+                    iconBg: 'bg-amber-500/15',
+                    iconColor: 'text-amber-600',
+                    iconBorder: 'border-amber-300/60',
+                    activeRing: 'ring-amber-400/50',
+                    activeBorder: 'border-amber-400',
+                    activeBg: 'bg-amber-50/70'
+                  },
+                  {
+                    id: 'garansi',
+                    title: 'Jaminan Garansi',
+                    filter: 'Jaminan Garansi',
+                    icon: Award,
+                    desc: 'Garansi pengerjaan tuntas & komitmen mutu teknisi',
+                    iconBg: 'bg-orange-500/15',
+                    iconColor: 'text-orange-600',
+                    iconBorder: 'border-orange-300/60',
+                    activeRing: 'ring-orange-400/50',
+                    activeBorder: 'border-orange-400',
+                    activeBg: 'bg-orange-50/70'
+                  },
+                  {
+                    id: 'tips',
+                    title: 'Tips Perawatan',
+                    filter: 'Tips Perawatan',
+                    icon: Sparkles,
+                    desc: 'Jadwal sedot rutin & cara cegah saluran mampet',
+                    iconBg: 'bg-emerald-500/15',
+                    iconColor: 'text-emerald-600',
+                    iconBorder: 'border-emerald-300/60',
+                    activeRing: 'ring-emerald-400/50',
+                    activeBorder: 'border-emerald-400',
+                    activeBg: 'bg-emerald-50/70'
+                  },
+                  {
+                    id: 'keamanan',
+                    title: 'SOP Keamanan',
+                    filter: 'SOP Keamanan (APD)',
+                    icon: ShieldCheck,
+                    desc: 'Protokol K3, APD lengkap & standar higienis',
+                    iconBg: 'bg-emerald-500/15',
+                    iconColor: 'text-emerald-700',
+                    iconBorder: 'border-emerald-300/60',
+                    activeRing: 'ring-emerald-400/50',
+                    activeBorder: 'border-emerald-400',
+                    activeBg: 'bg-emerald-50/70'
+                  },
+                  {
+                    id: 'wilayah',
+                    title: 'Cakupan Wilayah',
+                    filter: 'Cakupan Wilayah',
+                    icon: MapPin,
+                    desc: 'Jangkauan armada di 23 kecamatan Kota & Kab. Bekasi',
+                    iconBg: 'bg-cyan-500/15',
+                    iconColor: 'text-cyan-600',
+                    iconBorder: 'border-cyan-300/60',
+                    activeRing: 'ring-cyan-400/50',
+                    activeBorder: 'border-cyan-400',
+                    activeBg: 'bg-cyan-50/70'
+                  },
+                  {
+                    id: 'legalitas',
+                    title: 'Legalitas & IPLT',
+                    filter: 'Legalitas & IPLT',
+                    icon: FileCheck,
+                    desc: 'Manifest resmi IPLT Sumur Batu, NIB & faktur pajak',
+                    iconBg: 'bg-teal-500/15',
+                    iconColor: 'text-teal-600',
+                    iconBorder: 'border-teal-300/60',
+                    activeRing: 'ring-teal-400/50',
+                    activeBorder: 'border-teal-400',
+                    activeBg: 'bg-teal-50/70'
+                  }
+                ].map((item) => {
+                  const Icon = item.icon;
+                  const isSelected = faqCategoryFilter === item.filter;
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        playFaqClickSound();
+                        setFaqCategoryFilter(isSelected ? 'Semua' : item.filter);
+                      }}
+                      className={`group/legend flex flex-col p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        isSelected 
+                          ? `${item.activeBg} ${item.activeBorder} ring-2 ${item.activeRing} shadow-2xs`
+                          : 'bg-slate-50/80 hover:bg-white border-slate-200/90 hover:border-slate-300 hover:shadow-2xs'
+                      }`}
+                      title={`Klik untuk menyaring pertanyaan kategori ${item.title}`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md ${item.iconBg} ${item.iconColor} border ${item.iconBorder} shrink-0 group-hover/legend:scale-110 transition-transform`}>
+                          <Icon className="w-3 h-3" />
+                        </span>
+                        <span className={`text-[11px] font-extrabold truncate ${isSelected ? 'text-[#0A192F]' : 'text-slate-800'}`}>
+                          {item.title}
+                        </span>
+                      </div>
+                      <p className="text-[9.5px] text-slate-500 leading-tight">
+                        {item.desc}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* FAQ Toolbar: Sorting Dropdown & Results Counter */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 max-w-3xl mx-auto px-2 pt-2 text-xs text-slate-500">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span>Menampilkan</span>
+                <strong className="text-[#0A192F] font-black bg-slate-200/70 px-1.5 py-0.5 rounded">
+                  {sortedFaqs.length}
+                </strong>
+                <span>dari {FAQS.length} pertanyaan</span>
+                {faqSearchQuery && (
+                  <span className="text-slate-600">
+                    untuk "<strong>{faqSearchQuery}</strong>"
+                  </span>
+                )}
+                {faqCategoryFilter !== 'Semua' && (
+                  <span className="text-[#00C2CB] font-bold">
+                    • Kategori: {faqCategoryFilter}
+                  </span>
+                )}
+                {faqSortOrder === 'alphabetical' && (
+                  <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 font-bold px-2 py-0.5 rounded-full text-[10.5px]">
+                    <span>Sort: A-Z</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2.5 flex-wrap justify-between sm:justify-end">
+                {/* Sorting Dropdown */}
                 <div className="flex items-center gap-2">
+                  <label 
+                    htmlFor="faq-sort-dropdown" 
+                    className="text-xs font-bold text-slate-600 flex items-center gap-1.5 cursor-pointer"
+                    title="Urutkan pertanyaan FAQ"
+                  >
+                    <ArrowUpDown className="w-3.5 h-3.5 text-[#00C2CB]" />
+                    <span>Urutkan:</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="faq-sort-dropdown"
+                      data-testid="faq-sort-dropdown"
+                      value={faqSortOrder}
+                      onChange={(e) => {
+                        playFaqClickSound();
+                        setFaqSortOrder(e.target.value as 'recent' | 'alphabetical');
+                      }}
+                      className="text-xs font-bold text-[#0A192F] bg-white border-2 border-slate-200 hover:border-[#00C2CB] rounded-xl pl-3 pr-8 py-1.5 focus:outline-none focus:border-[#00C2CB] focus:ring-2 focus:ring-[#00C2CB]/20 transition-all cursor-pointer shadow-2xs appearance-none"
+                      aria-label="Urutkan pertanyaan FAQ"
+                    >
+                      <option value="recent">Recent</option>
+                      <option value="alphabetical">Alphabetical (A-Z)</option>
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setShowPrintFaqModal(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-[#00C2CB] bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs hover:border-slate-300 transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-[#00C2CB] bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-2xs hover:border-slate-300 transition-all cursor-pointer"
                     title="Cetak daftar FAQ yang sedang difilter"
                   >
                     <Printer className="w-3.5 h-3.5 text-[#00C2CB]" />
-                    <span>Print FAQ ({filteredFaqs.length})</span>
+                    <span className="hidden sm:inline">Print FAQ</span>
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => exportFaqsToCsv(filteredFaqs, {
+                    onClick={() => exportFaqsToCsv(sortedFaqs, {
                       activeCategory: faqCategoryFilter,
                       searchQuery: faqSearchQuery
                     })}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs hover:border-emerald-300 transition-all cursor-pointer"
-                    title="Unduh daftar FAQ yang difilter sebagai CSV"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-emerald-700 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 shadow-2xs hover:border-emerald-300 transition-all cursor-pointer"
+                    title="Unduh daftar FAQ sebagai CSV"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
                     <span>CSV</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFaqSearchQuery('');
-                      setFaqCategoryFilter('Semua');
-                    }}
-                    className="text-xs font-bold text-[#FF6B00] hover:text-[#E65F00] hover:underline cursor-pointer shrink-0 ml-1"
-                  >
-                    Reset Filter
-                  </button>
+
+                  {(faqSearchQuery.trim() || faqCategoryFilter !== 'Semua' || faqSortOrder !== 'recent') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playFaqClickSound();
+                        setFaqSearchQuery('');
+                        setFaqCategoryFilter('Semua');
+                        setFaqSortOrder('recent');
+                      }}
+                      className="text-xs font-bold text-[#FF6B00] hover:text-[#E65F00] hover:underline cursor-pointer shrink-0 ml-1"
+                    >
+                      Reset
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* HIGH-CONTRAST COMPLIANCE NOTICE BLOCK FOR COMMERCIAL CLIENTS */}
@@ -1480,7 +1780,7 @@ export default function App() {
           </div>
 
           {/* FAQ Accordion List or Empty State */}
-          {filteredFaqs.length === 0 ? (
+          {sortedFaqs.length === 0 ? (
             <div className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-10 text-center shadow-sm">
               <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200">
                 <Search className="w-6 h-6" />
@@ -1534,8 +1834,14 @@ export default function App() {
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredFaqs.map((faq, idx) => {
+            <motion.div 
+              key={`faq-stagger-${faqSearchQuery}-${faqCategoryFilter}-${faqSortOrder}`}
+              variants={faqStaggerContainerVariants}
+              initial="hidden"
+              animate="visible"
+              className="space-y-4 print:space-y-4"
+            >
+              {sortedFaqs.map((faq, idx) => {
                 const isOpen = activeFaq === faq.q;
                 
                 // Dynamic descriptive styling & icon configurations per FAQ type
@@ -1676,10 +1982,11 @@ export default function App() {
                 const faqAnchorId = `faq-${faq.id || (idx + 1)}`;
 
                 return (
-                  <div
-                    key={idx}
+                  <motion.div
+                    key={faq.id || idx}
+                    variants={faqStaggerItemVariants}
                     id={faqAnchorId}
-                    className={`bg-white rounded-2xl border transition-all overflow-hidden scroll-mt-28 ${
+                    className={`bg-white rounded-2xl border transition-all overflow-hidden scroll-mt-28 print:transform-none print:opacity-100 ${
                       isOpen 
                         ? isPricing
                           ? 'border-amber-400 shadow-md ring-2 ring-amber-400/20'
@@ -1904,10 +2211,10 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                 );
               })}
-            </div>
+            </motion.div>
           )}
 
           <div className="text-center mt-10">
@@ -2032,6 +2339,7 @@ export default function App() {
                 <li><a href="#dokumentasi" className="hover:text-[#00C2CB] transition-colors">Dokumentasi & Legalitas</a></li>
                 <li><a href="#galeri" className="hover:text-[#00C2CB] transition-colors">Galeri Lapangan</a></li>
                 <li><a href="#testimoni" className="hover:text-[#00C2CB] transition-colors">Testimoni Klien</a></li>
+                <li><a href="#klien" className="hover:text-[#00C2CB] transition-colors">Klien Rekanan (15+ Perusahaan)</a></li>
                 <li><a href="#faq" className="hover:text-[#00C2CB] transition-colors">FAQ</a></li>
               </ul>
             </div>
@@ -2248,7 +2556,7 @@ export default function App() {
       <PrintFaqModal
         isOpen={showPrintFaqModal}
         onClose={() => setShowPrintFaqModal(false)}
-        faqs={filteredFaqs}
+        faqs={sortedFaqs}
         activeCategory={faqCategoryFilter}
         searchQuery={faqSearchQuery}
         totalFaqsCount={FAQS.length}

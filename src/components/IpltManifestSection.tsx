@@ -16,18 +16,21 @@ import {
   Sparkles,
   ArrowRight
 } from 'lucide-react';
-import { CONTACT_INFO } from '../data/websiteData';
+import { CONTACT_INFO, CORPORATE_CLIENTS } from '../data/websiteData';
 
 export default function IpltManifestSection() {
   const [activeTab, setActiveTab] = useState<'klien' | 'iplt' | 'transporter'>('klien');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>('hyundai');
+
+  const selectedClient = CORPORATE_CLIENTS.find(c => c.id === selectedClientId) || CORPORATE_CLIENTS[0];
 
   const manifestData = {
     docNumber: 'MNF-IPLT/BKS/2026/04882',
     date: '12 Februari 2026',
     time: '11:42 WIB',
-    clientName: 'PT Cikarang Precision Parts / Klien Terdaftar',
-    clientAddress: 'Kawasan Industri GIIC / Delta Silicon, Cikarang, Bekasi',
+    clientName: selectedClient.name,
+    clientAddress: `${selectedClient.location} • Sektor: ${selectedClient.sector}`,
     wasteType: 'Lumpur Tinja / Black Water Domestik (KBLI 37011)',
     volume: '4.500 Liter (4,5 m³)',
     transporterName: 'PT KUSUMA GEMILANG RAYA',
@@ -169,6 +172,26 @@ export default function IpltManifestSection() {
                   </span>
                   <span className="text-[10px] text-slate-500 font-mono">Tgl: {manifestData.date}</span>
                 </div>
+
+                {/* Simulasi Klien Rekanan Dropdown */}
+                <div className="mb-2.5 pb-2 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 bg-slate-100/70 p-2 rounded-lg">
+                  <label htmlFor="manifest-client-selector" className="text-[10.5px] font-bold text-slate-700 flex items-center gap-1">
+                    <span>Simulasi Perusahaan Rekanan Resmi:</span>
+                  </label>
+                  <select
+                    id="manifest-client-selector"
+                    value={selectedClientId}
+                    onChange={(e) => setSelectedClientId(e.target.value)}
+                    className="text-[11px] font-bold text-[#0A192F] bg-white border border-slate-300 rounded-md px-2 py-1 focus:ring-1 focus:ring-[#00C2CB] focus:outline-none cursor-pointer"
+                  >
+                    {CORPORATE_CLIENTS.map((corp) => (
+                      <option key={corp.id} value={corp.id}>
+                        {corp.name} ({corp.sector.split('&')[0].trim()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
                   <div>
                     <span className="text-slate-500 block">Nama Perusahaan / Pemilik:</span>

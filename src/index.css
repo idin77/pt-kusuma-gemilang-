@@ -126,6 +126,10 @@
   border-top-color: #0A192F !important;
 }
 
+.faq-print-fixed-watermark {
+  display: none;
+}
+
 /* Print Specific Rules for Professional Reference Documents */
 @media print {
   body {
@@ -164,7 +168,9 @@
     padding: 1.2cm !important;
     box-shadow: none !important;
     border: none !important;
-    background: white !important;
+    background-color: #ffffff !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='440' height='260' viewBox='0 0 440 260'%3E%3Cg transform='rotate(-28 100 100)'%3E%3Ctext x='20' y='75' font-family='sans-serif' font-size='26' font-weight='900' letter-spacing='3' fill='%230A192F' opacity='0.05'%3EKusuma Gemilang Raya%3C/text%3E%3Ctext x='22' y='98' font-family='sans-serif' font-size='9' font-weight='800' letter-spacing='3' fill='%23334155' opacity='0.05'%3EPT KUSUMA GEMILANG RAYA • DOKUMEN RESMI%3C/text%3E%3Ctext x='230' y='200' font-family='sans-serif' font-size='26' font-weight='900' letter-spacing='3' fill='%230A192F' opacity='0.05'%3EKusuma Gemilang Raya%3C/text%3E%3Ctext x='232' y='223' font-family='sans-serif' font-size='9' font-weight='800' letter-spacing='3' fill='%23334155' opacity='0.05'%3ELAYANAN SANITASI &amp; LIMBAH BEKASI%3C/text%3E%3C/g%3E%3C/svg%3E") !important;
+    background-repeat: repeat !important;
     color: #111827 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -179,9 +185,28 @@
     position: absolute !important;
     inset: 0 !important;
     width: 100% !important;
+    min-height: 100% !important;
     height: 100% !important;
     pointer-events: none !important;
     user-select: none !important;
+    z-index: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .faq-print-fixed-watermark {
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    pointer-events: none !important;
+    user-select: none !important;
+    z-index: 0 !important;
+    opacity: 0.055 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }

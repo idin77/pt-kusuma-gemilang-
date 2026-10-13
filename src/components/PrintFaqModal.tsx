@@ -38,12 +38,45 @@ import {
   Building,
   Target,
   Layers,
-  BookOpen
+  BookOpen,
+  ArrowUpDown,
+  Smartphone,
+  Globe
 } from 'lucide-react';
-import { FaqItem, CONTACT_INFO, KOTA_BEKASI, KAB_BEKASI } from '../data/websiteData';
+import { FaqItem, CONTACT_INFO, KOTA_BEKASI, KAB_BEKASI, CORPORATE_CLIENTS } from '../data/websiteData';
 import { exportFaqsToCsv } from '../utils/exportCsv';
 import { playFaqClickSound } from '../utils/soundEffects';
 import { calculateFaqReadingTime } from '../utils/readingTime';
+import { useVoiceSearch } from '../utils/useVoiceSearch';
+import { FaqVoiceSearchButton } from './FaqVoiceSearchButton';
+import { motion, type Variants } from 'framer-motion';
+
+// Framer Motion subtle slide-up stagger animation variants for FAQ items in printable area
+const modalStaggerContainerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.045,
+      delayChildren: 0.02
+    }
+  }
+};
+
+const modalStaggerItemVariants: Variants = {
+  hidden: { 
+    opacity: 0, 
+    y: 14 
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: {
+      duration: 0.28,
+      ease: 'easeOut'
+    }
+  }
+};
 
 interface PrintFaqModalProps {
   isOpen: boolean;
@@ -64,25 +97,45 @@ export default function PrintFaqModal({
 }: PrintFaqModalProps) {
   const [copiedAll, setCopiedAll] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+  const [faqSectionQrCodeUrl, setFaqSectionQrCodeUrl] = useState<string>('');
   const [faqQrCodes, setFaqQrCodes] = useState<Record<string, string>>({});
   const [totalPages, setTotalPages] = useState<number>(1);
   const [highlightMatchesEnabled, setHighlightMatchesEnabled] = useState<boolean>(true);
   const [inModalSearch, setInModalSearch] = useState<string>('');
+  const [modalSortOrder, setModalSortOrder] = useState<'recent' | 'alphabetical'>('recent');
   const printableAreaRef = useRef<HTMLDivElement>(null);
+
+  // Voice Search integration using Web Speech API for #faq-printable-area search input
+  const modalVoiceSearch = useVoiceSearch({
+    lang: 'id-ID',
+    onTranscriptChange: (text) => {
+      setInModalSearch(text);
+    },
+    onFinalTranscript: (text) => {
+      setInModalSearch(text);
+    },
+  });
 
   // Sync effective search query from prop or in-modal input
   const effectiveSearchQuery = inModalSearch.trim() || searchQuery.trim();
 
-  // Filter displayed FAQs if modal search query is active
+  // Filter and sort displayed FAQs if modal search query or sort order is active
   const displayedFaqs = React.useMemo(() => {
-    if (!inModalSearch.trim()) return faqs;
-    const q = inModalSearch.toLowerCase().trim();
-    return faqs.filter(f => 
-      f.q.toLowerCase().includes(q) || 
-      f.a.toLowerCase().includes(q) || 
-      (f.category || '').toLowerCase().includes(q)
-    );
-  }, [faqs, inModalSearch]);
+    let list = faqs;
+    if (inModalSearch.trim()) {
+      const q = inModalSearch.toLowerCase().trim();
+      list = faqs.filter(f => 
+        f.q.toLowerCase().includes(q) || 
+        f.a.toLowerCase().includes(q) || 
+        (f.category || '').toLowerCase().includes(q)
+      );
+    }
+    const sorted = [...list];
+    if (modalSortOrder === 'alphabetical') {
+      sorted.sort((a, b) => a.q.localeCompare(b.q, 'id', { sensitivity: 'base' }));
+    }
+    return sorted;
+  }, [faqs, inModalSearch, modalSortOrder]);
 
   // Highlight all matching instances of current faqSearchQuery within both question and answer texts
   const highlightMatches = (text: string, query: string) => {
@@ -358,6 +411,31 @@ export default function PrintFaqModal({
       console.error('Gagal generate QR Code:', err);
     });
   }, [bookingWhatsAppUrl]);
+
+  // Target URL linking directly to the current FAQ section URL
+  const currentFaqSectionUrl = React.useMemo(() => {
+    if (typeof window === 'undefined') return 'https://sedotwcbekasi.co.id#faq';
+    const origin = window.location.origin;
+    const pathname = window.location.pathname === '/' ? '' : window.location.pathname;
+    return `${origin}${pathname}#faq`;
+  }, []);
+
+  // Generate QR code linking directly to the current FAQ section URL for mobile access while viewing printed copies
+  useEffect(() => {
+    QRCode.toDataURL(currentFaqSectionUrl, {
+      width: 256,
+      margin: 1,
+      color: {
+        dark: '#0A192F',
+        light: '#FFFFFF'
+      },
+      errorCorrectionLevel: 'M'
+    }).then(url => {
+      setFaqSectionQrCodeUrl(url);
+    }).catch(err => {
+      console.error('Gagal generate QR Code FAQ Section URL:', err);
+    });
+  }, [currentFaqSectionUrl]);
 
   // Generate QR code for each FAQ item that redirects directly to its specific anchor link
   useEffect(() => {
@@ -718,72 +796,109 @@ export default function PrintFaqModal({
             ref={printableAreaRef}
             className="relative overflow-hidden max-w-3xl mx-auto bg-white p-6 sm:p-12 rounded-2xl shadow-md border border-slate-200 text-slate-800 font-sans print:shadow-none print:border-none print:p-0 print:overflow-visible"
           >
-            {/* SUBTLE 'DRAFT' WATERMARK OVERLAY ACROSS THE ENTIRE PRINTABLE AREA */}
+            {/* SUBTLE 'KUSUMA GEMILANG RAYA' WATERMARK OVERLAY ACROSS THE ENTIRE PRINTABLE AREA */}
             <div 
               id="faq-print-draft-watermark"
+              data-watermark="kusuma-gemilang-raya"
               aria-hidden="true"
               className="faq-watermark-overlay pointer-events-none select-none absolute inset-0 z-0 overflow-hidden flex flex-col justify-around items-center"
             >
-              {/* Seamless repeating diagonal DRAFT watermark pattern */}
+              {/* Seamless repeating diagonal 'Kusuma Gemilang Raya' watermark pattern */}
               <svg 
-                className="absolute inset-0 w-full h-full opacity-[0.035] print:opacity-[0.05]" 
+                className="absolute inset-0 w-full h-full opacity-[0.038] print:opacity-[0.06]" 
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <defs>
                   <pattern 
-                    id="draft-watermark-pattern" 
-                    width="380" 
-                    height="240" 
+                    id="kusuma-watermark-pattern" 
+                    width="440" 
+                    height="260" 
                     patternUnits="userSpaceOnUse" 
-                    patternTransform="rotate(-30 60 60)"
+                    patternTransform="rotate(-28 100 100)"
                   >
+                    {/* Row 1 Branding */}
                     <text 
-                      x="30" 
-                      y="95" 
+                      x="20" 
+                      y="75" 
                       fontFamily="ui-sans-serif, system-ui, -apple-system, sans-serif" 
-                      fontSize="54" 
+                      fontSize="26" 
                       fontWeight="900" 
-                      letterSpacing="12" 
-                      fill="#0f172a"
+                      letterSpacing="3" 
+                      fill="#0A192F"
                     >
-                      DRAFT
+                      Kusuma Gemilang Raya
                     </text>
                     <text 
-                      x="32" 
-                      y="128" 
+                      x="22" 
+                      y="98" 
                       fontFamily="ui-sans-serif, system-ui, -apple-system, sans-serif" 
-                      fontSize="10" 
+                      fontSize="9" 
                       fontWeight="800" 
-                      letterSpacing="4" 
+                      letterSpacing="3" 
                       fill="#334155"
                     >
-                      PT KUSUMA GEMILANG RAYA • FAQ
+                      PT KUSUMA GEMILANG RAYA • DOKUMEN RESMI
+                    </text>
+
+                    {/* Row 2 Offset Branding */}
+                    <text 
+                      x="230" 
+                      y="200" 
+                      fontFamily="ui-sans-serif, system-ui, -apple-system, sans-serif" 
+                      fontSize="26" 
+                      fontWeight="900" 
+                      letterSpacing="3" 
+                      fill="#0A192F"
+                    >
+                      Kusuma Gemilang Raya
+                    </text>
+                    <text 
+                      x="232" 
+                      y="223" 
+                      fontFamily="ui-sans-serif, system-ui, -apple-system, sans-serif" 
+                      fontSize="9" 
+                      fontWeight="800" 
+                      letterSpacing="3" 
+                      fill="#334155"
+                    >
+                      LAYANAN SANITASI & LIMBAH BEKASI
                     </text>
                   </pattern>
                 </defs>
-                <rect width="100%" height="100%" fill="url(#draft-watermark-pattern)" />
+                <rect width="100%" height="100%" fill="url(#kusuma-watermark-pattern)" />
               </svg>
 
-              {/* Diagonal prominent yet subtle 'DRAFT' stamps across document height */}
-              <div className="relative w-full h-full flex flex-col justify-around items-center py-16 gap-36">
+              {/* Diagonal prominent yet subtle 'Kusuma Gemilang Raya' official stamps across document height */}
+              <div className="relative w-full h-full flex flex-col justify-around items-center py-20 gap-40">
                 {[...Array(6)].map((_, idx) => (
                   <div
                     key={idx}
-                    className="transform -rotate-[32deg] text-center whitespace-nowrap opacity-[0.035] print:opacity-[0.055]"
+                    className="transform -rotate-[26deg] text-center whitespace-nowrap opacity-[0.03] print:opacity-[0.05]"
                   >
-                    <div className="inline-flex flex-col items-center border-[3.5px] border-dashed border-slate-700/80 px-10 py-3.5 rounded-2xl tracking-[0.3em] font-black uppercase shadow-xs">
-                      <span className="text-5xl sm:text-6xl md:text-7xl font-black text-slate-900 tracking-[0.25em]">
-                        DRAFT
+                    <div className="inline-flex flex-col items-center border-[2.5px] border-dashed border-slate-700/70 px-10 py-3.5 rounded-2xl tracking-[0.2em] font-black uppercase shadow-xs">
+                      <span className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 tracking-[0.16em]">
+                        Kusuma Gemilang Raya
                       </span>
-                      <div className="flex items-center gap-2 mt-1 text-[10px] sm:text-xs font-black tracking-[0.35em] text-slate-800">
+                      <div className="flex items-center gap-2 mt-1 text-[10px] sm:text-xs font-black tracking-[0.32em] text-slate-800">
                         <span>PT KUSUMA GEMILANG RAYA</span>
                         <span>•</span>
-                        <span>INFORMATIONAL COPY</span>
+                        <span>LEMBAR DOKUMEN RESMI FAQ</span>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Dedicated Print-Only Fixed Watermark (repeats across all printed pages in print media) */}
+            <div
+              id="faq-print-repeating-page-watermark"
+              aria-hidden="true"
+              className="faq-print-fixed-watermark pointer-events-none select-none"
+            >
+              <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                <rect width="100%" height="100%" fill="url(#kusuma-watermark-pattern)" />
+              </svg>
             </div>
 
             {/* Document Content - relative z-10 for sharp readability over watermark */}
@@ -807,7 +922,7 @@ export default function PrintFaqModal({
                 </div>
 
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  {/* Embedded Quick Search Input inside #faq-printable-area */}
+                  {/* Embedded Quick Search Input inside #faq-printable-area with Voice Search */}
                   <div className="relative flex items-center">
                     <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
                     <input
@@ -822,22 +937,63 @@ export default function PrintFaqModal({
                         setInModalSearch(e.target.value);
                       }}
                       placeholder="Cari dalam dokumen A4..."
-                      className="pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-300 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#00C2CB] focus:ring-2 focus:ring-[#00C2CB]/20 w-48 sm:w-56 shadow-2xs transition-all"
+                      className={`pl-8 ${
+                        inModalSearch ? 'pr-16' : 'pr-10'
+                      } py-1.5 text-xs bg-white border border-slate-300 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#00C2CB] focus:ring-2 focus:ring-[#00C2CB]/20 w-48 sm:w-60 shadow-2xs transition-all ${
+                        modalVoiceSearch.isListening ? 'border-rose-400 ring-2 ring-rose-300/40' : ''
+                      }`}
                       aria-label="Cari pertanyaan dalam area cetak FAQ"
                     />
-                    {inModalSearch && (
-                      <button
-                        type="button"
-                        onClick={() => {
+                    <div className="absolute right-1.5 flex items-center gap-0.5">
+                      {inModalSearch && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playFaqClickSound();
+                            setInModalSearch('');
+                            modalVoiceSearch.resetTranscript();
+                          }}
+                          className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 rounded-full"
+                          aria-label="Bersihkan pencarian dokumen"
+                          title="Hapus pencarian"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                      <FaqVoiceSearchButton
+                        id="faq-printable-voice-search-btn"
+                        size="sm"
+                        isListening={modalVoiceSearch.isListening}
+                        isSupported={modalVoiceSearch.isSupported}
+                        onToggle={modalVoiceSearch.toggleListening}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Embedded Sorting Dropdown inside #faq-printable-area toolbar */}
+                  <div className="relative flex items-center print:hidden">
+                    <label 
+                      htmlFor="faq-printable-sort-dropdown" 
+                      className="sr-only"
+                    >
+                      Urutkan FAQ Dokumen
+                    </label>
+                    <div className="flex items-center gap-1.5 bg-white border border-slate-300 hover:border-[#00C2CB] focus-within:border-[#00C2CB] focus-within:ring-2 focus-within:ring-[#00C2CB]/20 rounded-xl px-2.5 py-1.5 shadow-2xs transition-all">
+                      <ArrowUpDown className="w-3.5 h-3.5 text-[#00C2CB] shrink-0" />
+                      <select
+                        id="faq-printable-sort-dropdown"
+                        value={modalSortOrder}
+                        onChange={(e) => {
                           playFaqClickSound();
-                          setInModalSearch('');
+                          setModalSortOrder(e.target.value as 'recent' | 'alphabetical');
                         }}
-                        className="absolute right-2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 rounded-full"
-                        aria-label="Bersihkan pencarian dokumen"
+                        className="bg-transparent font-bold text-xs text-[#0A192F] focus:outline-none cursor-pointer pr-1"
+                        aria-label="Urutkan pertanyaan FAQ cetak"
                       >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
+                        <option value="recent">Recent</option>
+                        <option value="alphabetical">Alphabetical (A-Z)</option>
+                      </select>
+                    </div>
                   </div>
 
                   <button
@@ -851,6 +1007,35 @@ export default function PrintFaqModal({
                     <span>Print FAQ</span>
                   </button>
                 </div>
+
+                {/* Voice Search status feedback banner (Screen only, hidden on print) */}
+                {modalVoiceSearch.isListening && (
+                  <div className="w-full mt-2.5 px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center justify-between animate-pulse print:hidden">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                      <span>Sedang mendengarkan... Ucapkan kata kunci FAQ (contoh: "garansi", "biaya", "septic tank")</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => modalVoiceSearch.stopListening()}
+                      className="text-rose-600 hover:text-rose-800 font-bold underline cursor-pointer text-xs"
+                    >
+                      Selesai
+                    </button>
+                  </div>
+                )}
+                {modalVoiceSearch.errorMessage && (
+                  <div className="w-full mt-2.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl flex items-center justify-between print:hidden">
+                    <span>{modalVoiceSearch.errorMessage}</span>
+                    <button
+                      type="button"
+                      onClick={() => modalVoiceSearch.resetTranscript()}
+                      className="text-amber-700 hover:text-amber-900 font-bold underline cursor-pointer ml-2 text-xs"
+                    >
+                      Tutup
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* TOP CENTERED OFFICIAL LOGO OF PT KUSUMA GEMILANG RAYA (OPTIMIZED FOR A4 PRINT) */}
@@ -1191,6 +1376,89 @@ export default function PrintFaqModal({
                 </div>
               </div>
 
+            {/* OFFICIAL FAQ SECTION DIGITAL URL QR CODE (FOR CUSTOMERS TO SCAN ON MOBILE PHONES WHILE VIEWING PRINTED COPIES) */}
+            <div 
+              id="faq-section-mobile-qr-card"
+              data-testid="faq-section-qr-card"
+              className="mt-4 mb-5 p-4 rounded-2xl border-2 border-[#0A192F] bg-gradient-to-r from-slate-50 via-cyan-50/40 to-slate-50 print:bg-white print:border-slate-800 shadow-2xs break-inside-avoid print:break-inside-avoid"
+            >
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                {/* Left Information & Scanning Guide */}
+                <div className="flex-1 text-center sm:text-left">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#0A192F] text-[#00C2CB] print:bg-black print:text-white font-extrabold text-[9px] uppercase tracking-wider mb-1.5">
+                    <Smartphone className="w-3 h-3 text-[#00C2CB] print:text-white shrink-0" />
+                    <span>Akses Versi Online • Scan Melalui Kamera HP</span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-black text-[#0A192F] print:text-black tracking-tight flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+                    <span>Buka Halaman FAQ Online di Smartphone Anda</span>
+                    <span className="text-[9.5px] bg-emerald-100 text-emerald-800 border border-emerald-300 print:border-black print:bg-slate-100 print:text-black px-2 py-0.5 rounded-full font-bold">
+                      Tautan Langsung #faq
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-600 print:text-slate-800 mt-1 max-w-lg leading-relaxed">
+                    Sedang melihat salinan cetak FAQ ini? Arahkan kamera smartphone atau Google Lens ke kode QR di samping untuk langsung membuka halaman FAQ resmi PT Kusuma Gemilang Raya secara online di ponsel Anda — lengkap dengan pencarian suara interaktif, filter kategori, dan kalkulator estimasi biaya cepat.
+                  </p>
+                  
+                  <div className="mt-2.5 flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1.5 text-[10.5px] font-bold text-slate-700 print:text-slate-900">
+                    <a 
+                      href={currentFaqSectionUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[#008c94] print:text-black font-mono hover:underline"
+                      title="Klik untuk membuka tautan FAQ online langsung"
+                    >
+                      <Globe className="w-3.5 h-3.5 text-[#008c94] print:text-black shrink-0" />
+                      <span>{currentFaqSectionUrl}</span>
+                      <ExternalLink className="w-2.5 h-2.5 text-slate-400 print:hidden" />
+                    </a>
+                    <span className="text-slate-300 print:text-slate-400">•</span>
+                    <span className="text-emerald-700 print:text-slate-800 font-semibold text-[10px] flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600 print:text-black shrink-0" />
+                      Akses Cepat 24 Jam Tanpa Perlu Mengetik URL
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right QR Code Graphic Box */}
+                <div className="shrink-0 flex flex-col items-center">
+                  <div className="relative group p-2.5 bg-white rounded-2xl border-2 border-[#0A192F] print:border-black shadow-xs print:shadow-none text-center">
+                    {/* Badge on QR frame */}
+                    <div className="mb-1 flex items-center justify-center gap-1 bg-[#0A192F] text-amber-300 print:bg-black print:text-white px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider">
+                      <Scan className="w-2.5 h-2.5 text-[#00C2CB] print:text-white shrink-0" />
+                      <span>PINDAI DI HP</span>
+                    </div>
+
+                    <a 
+                      href={currentFaqSectionUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block cursor-pointer transition-transform hover:scale-105"
+                      title="Klik atau pindai QR Code untuk membuka halaman FAQ online resmi"
+                    >
+                      {faqSectionQrCodeUrl ? (
+                        <img 
+                          id="faq-section-url-qr-img"
+                          src={faqSectionQrCodeUrl} 
+                          alt="QR Code Tautan Langsung Halaman FAQ PT Kusuma Gemilang Raya" 
+                          className="w-24 h-24 sm:w-28 sm:h-28 object-contain mx-auto"
+                          loading="eager"
+                        />
+                      ) : (
+                        <div className="w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center bg-slate-100 text-slate-400 text-xs">
+                          Memuat QR...
+                        </div>
+                      )}
+                    </a>
+
+                    <div className="mt-1 pt-1 border-t border-slate-200 print:border-slate-400 text-[8.5px] font-extrabold uppercase tracking-wide text-slate-700 print:text-black flex items-center justify-center gap-1">
+                      <QrCodeIcon className="w-2.5 h-2.5 text-[#008c94] print:text-black shrink-0" />
+                      <span>Web FAQ Online</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* DAFTAR ISI (TABLE OF CONTENTS) NAVIGATIONAL LINK SECTION */}
             <div 
               id="faq-daftar-isi"
@@ -1514,6 +1782,64 @@ export default function PrintFaqModal({
               </div>
             </section>
 
+            {/* SECTION: PERUSAHAAN REKANAN & KLIEN INDUSTRI TERPERCAYA (CORPORATE CLIENTS ROSTER) */}
+            <section
+              id="faq-corporate-clients-section"
+              className="mb-6 p-4 sm:p-5 rounded-2xl bg-white print:bg-white text-[#0A192F] print:text-black border-2 border-slate-200 print:border-slate-800 shadow-xs break-inside-avoid print:break-inside-avoid relative"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 mb-3 border-b border-slate-200 print:border-slate-300">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#0A192F] text-white print:bg-black flex items-center justify-center shrink-0">
+                    <Building className="w-4 h-4 text-[#00C2CB] print:text-white" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-black text-xs sm:text-sm text-[#0A192F] print:text-black uppercase tracking-wide">
+                        Perusahaan Rekanan & Klien Industri Terpercaya ({CORPORATE_CLIENTS.length} Perusahaan)
+                      </h3>
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 print:bg-slate-200 print:text-black print:border print:border-slate-400">
+                        Audit Verified B2B
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 print:text-slate-600 mt-0.5">
+                      Telah bekerjasama dalam penyedotan limbah STP, septic tank industri & penerbitan dokumen Manifest IPLT resmi
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-[9.5px] font-mono text-slate-500 print:text-slate-700 font-bold self-start sm:self-auto">
+                  SPPKP / Faktur Pajak Resmi
+                </div>
+              </div>
+
+              {/* Grid of 15 Corporate Clients */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-[10px]">
+                {CORPORATE_CLIENTS.map((client, cIdx) => (
+                  <div 
+                    key={client.id}
+                    className="p-2 rounded-lg bg-slate-50 print:bg-slate-50/50 border border-slate-200 print:border-slate-300 flex items-start gap-1.5"
+                  >
+                    <span className="font-mono font-bold text-slate-400 print:text-slate-600 shrink-0 text-[9px] mt-0.5">
+                      {String(cIdx + 1).padStart(2, '0')}.
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-900 print:text-black truncate leading-tight">
+                        {client.name}
+                      </div>
+                      <div className="text-[9px] text-slate-500 print:text-slate-600 truncate mt-0.5">
+                        {client.sector} • {client.location}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-2.5 pt-2 border-t border-slate-100 print:border-slate-200 flex flex-wrap items-center justify-between text-[9px] text-slate-500 print:text-slate-600">
+                <span>✓ Pengadaan vendor B2B disertai Faktur Pajak resmi (SPPKP) & Berita Acara sah</span>
+                <span className="font-semibold text-emerald-700 print:text-black">Kepatuhan UU No. 32/2009 & Perda Pengelolaan Air Limbah Domestik</span>
+              </div>
+            </section>
+
             {/* Judul Isi Dokumen */}
             <div className="mb-6">
               <h2 className="text-lg sm:text-xl font-black text-[#0A192F]">
@@ -1525,14 +1851,24 @@ export default function PrintFaqModal({
             </div>
 
             {/* List Pertanyaan & Jawaban */}
-            <div className="space-y-6">
+            <motion.div 
+              key={`modal-faq-stagger-${effectiveSearchQuery}-${modalSortOrder}`}
+              variants={modalStaggerContainerVariants}
+              initial="hidden"
+              animate="visible"
+              className="space-y-6 print:space-y-6"
+            >
               {displayedFaqs.map((faq, index) => {
                 const catSlug = `faq-cat-${(faq.category || 'Umum').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
                 const isFirstOfCategory = index === 0 || (displayedFaqs[index - 1].category || 'Umum') !== (faq.category || 'Umum');
                 const catIndex = exportCategories.findIndex(c => c.slug === catSlug);
 
                 return (
-                  <div key={faq.id || index} className="space-y-3">
+                  <motion.div 
+                    key={faq.id || index} 
+                    variants={modalStaggerItemVariants}
+                    className="space-y-3 print:transform-none print:opacity-100"
+                  >
                     {/* Category Anchor Section Header */}
                     {isFirstOfCategory && (
                       <div 
@@ -1829,10 +2165,10 @@ export default function PrintFaqModal({
                         })()}
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
-            </div>
+            </motion.div>
 
             {/* OFFICIAL ENDORSEMENT SECTION: COMPANY STAMP & QR CODE BOOKING BLOCK */}
             <div className="mt-8 pt-6 border-t-2 border-slate-900 break-inside-avoid print:break-inside-avoid">
