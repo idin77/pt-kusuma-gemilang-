@@ -49,6 +49,7 @@ import { playFaqClickSound } from '../utils/soundEffects';
 import { calculateFaqReadingTime } from '../utils/readingTime';
 import { useVoiceSearch } from '../utils/useVoiceSearch';
 import { FaqVoiceSearchButton } from './FaqVoiceSearchButton';
+import { FaqFeedbackVoting } from './FaqFeedbackVoting';
 import { motion, type Variants } from 'framer-motion';
 
 // Framer Motion subtle slide-up stagger animation variants for FAQ items in printable area
@@ -83,6 +84,7 @@ interface PrintFaqModalProps {
   onClose: () => void;
   faqs: FaqItem[];
   activeCategory: string;
+  activeSubCategory?: string;
   searchQuery: string;
   totalFaqsCount: number;
 }
@@ -92,6 +94,7 @@ export default function PrintFaqModal({
   onClose,
   faqs,
   activeCategory,
+  activeSubCategory = 'Semua',
   searchQuery,
   totalFaqsCount
 }: PrintFaqModalProps) {
@@ -103,6 +106,7 @@ export default function PrintFaqModal({
   const [highlightMatchesEnabled, setHighlightMatchesEnabled] = useState<boolean>(true);
   const [inModalSearch, setInModalSearch] = useState<string>('');
   const [modalSortOrder, setModalSortOrder] = useState<'recent' | 'alphabetical'>('recent');
+  const [modalShareCopied, setModalShareCopied] = useState<boolean>(false);
   const printableAreaRef = useRef<HTMLDivElement>(null);
 
   // Voice Search integration using Web Speech API for #faq-printable-area search input
@@ -412,13 +416,128 @@ export default function PrintFaqModal({
     });
   }, [bookingWhatsAppUrl]);
 
-  // Target URL linking directly to the current FAQ section URL
-  const currentFaqSectionUrl = React.useMemo(() => {
+  // Generate deep link to current FAQ view including active category, subCategory, and search
+  const getFaqDeepLinkUrl = React.useCallback(() => {
     if (typeof window === 'undefined') return 'https://sedotwcbekasi.co.id#faq';
     const origin = window.location.origin;
     const pathname = window.location.pathname === '/' ? '' : window.location.pathname;
-    return `${origin}${pathname}#faq`;
-  }, []);
+    const url = new URL(`${origin}${pathname}#faq`);
+    if (activeCategory && activeCategory !== 'Semua') {
+      url.searchParams.set('category', activeCategory);
+    }
+    if (activeSubCategory && activeSubCategory !== 'Semua') {
+      url.searchParams.set('subCategory', activeSubCategory);
+    }
+    const currentSearch = inModalSearch.trim() || searchQuery.trim();
+    if (currentSearch) {
+      url.searchParams.set('search', currentSearch);
+    }
+    return url.toString();
+  }, [activeCategory, activeSubCategory, inModalSearch, searchQuery]);
+
+  // Target URL linking directly to the current FAQ section URL
+  const currentFaqSectionUrl = React.useMemo(() => {
+    return getFaqDeepLinkUrl();
+  }, [getFaqDeepLinkUrl]);
+
+  // Open native OS share dialog with deep link to current FAQ view, with fallback to clipboard copy
+  const handleShareCurrentFaqView = async () => {
+    playFaqClickSound();
+    const deepLinkUrl = getFaqDeepLinkUrl();
+    const shareTitle = 'FAQ Resmi Sedot WC Bekasi - PT Kusuma Gemilang Raya';
+    let shareText = 'Pusat Tanya Jawab & Dokumen Resmi Sanitasi Bekasi oleh PT Kusuma Gemilang Raya.';
+    if (activeCategory !== 'Semua') {
+      shareText += ` Topik: ${activeCategory}.`;
+    }
+    if (activeSubCategory !== 'Semua') {
+      shareText += ` Layanan: ${activeSubCategory}.`;
+    }
+    const currentSearch = inModalSearch.trim() || searchQuery.trim();
+    if (currentSearch) {
+      shareText += ` Hasil pencarian: "${currentSearch}".`;
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: deepLinkUrl
+        });
+        return;
+      } catch (err: unknown) {
+        const error = err as { name?: string };
+        if (error?.name === 'AbortError') return;
+        console.warn('Native share was not completed, falling back to copy:', err);
+      }
+    }
+
+    // Fallback: Copy deep link to clipboard and trigger copy animation
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(deepLinkUrl);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = deepLinkUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+    } catch (copyErr) {
+      console.warn('Modal clipboard write fallback attempt:', copyErr);
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = deepLinkUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      } catch {
+        // Fallback suppressed
+      }
+    }
+
+    // Always trigger clipboard copy animation
+    setModalShareCopied(true);
+    setTimeout(() => setModalShareCopied(false), 2500);
+  };
+
+  // Share via Email mailto link with automatically populated subject, deep link, and FAQ summary
+  const modalEmailShareUrl = React.useMemo(() => {
+    const deepLink = getFaqDeepLinkUrl();
+    const topicLabel = activeCategory !== 'Semua' ? ` (${activeCategory})` : '';
+    const subject = `[FAQ Resmi] Tanya Jawab Dokumen Sedot WC & Sanitasi Bekasi - PT Kusuma Gemilang Raya${topicLabel}`;
+    
+    const currentSearch = inModalSearch.trim() || searchQuery.trim();
+    const summaryLines = [
+      'Halo,',
+      '',
+      'Berikut ringkasan dokumen Tanya Jawab (FAQ) resmi layanan Sedot WC & Pengolahan Limbah Bekasi dari PT Kusuma Gemilang Raya:',
+      '',
+      `• Kategori Dokumen: ${activeCategory}`,
+      ...(activeSubCategory && activeSubCategory !== 'Semua' ? [`• Sub-Kategori / Layanan: ${activeSubCategory}`] : []),
+      ...(currentSearch ? [`• Kata Kunci Pencarian: "${currentSearch}"`] : []),
+      `• Jumlah FAQ Ditampilkan: ${displayedFaqs.length} pertanyaan & jawaban`,
+      '',
+      'Akses tampilan interaktif lengkap melalui deep link resmi berikut:',
+      deepLink,
+      '',
+      '---',
+      'PT Kusuma Gemilang Raya (NIB KBLI 37011 - Berizin Resmi IPLT)',
+      'Hotline: 0812-9988-7766 | WhatsApp: 0812-9988-7766',
+      'Website: https://sedotwcbekasi.co.id'
+    ];
+
+    const body = summaryLines.join('\r\n');
+    return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }, [getFaqDeepLinkUrl, activeCategory, activeSubCategory, inModalSearch, searchQuery, displayedFaqs.length]);
 
   // Generate QR code linking directly to the current FAQ section URL for mobile access while viewing printed copies
   useEffect(() => {
@@ -1000,11 +1119,86 @@ export default function PrintFaqModal({
                     type="button"
                     id="print-faq-sheet-btn"
                     onClick={handlePrint}
-                    className="px-4 py-2 rounded-xl bg-[#0A192F] hover:bg-[#172A45] text-white text-xs font-bold flex items-center gap-2 transition-all shadow-md cursor-pointer hover:shadow-cyan-900/20"
+                    className="px-4 py-2 rounded-xl bg-[#0A192F] hover:bg-[#172A45] text-white text-xs font-bold flex items-center gap-2 transition-all shadow-md cursor-pointer hover:shadow-cyan-900/20 active:scale-98"
                     title="Cetak dokumen FAQ ini langsung ke printer atau simpan sebagai PDF A4"
                   >
                     <Printer className="w-3.5 h-3.5 text-[#00C2CB]" />
                     <span>Print FAQ</span>
+                  </button>
+
+                  {/* Share Icon Button next to Print FAQ button within #faq-printable-area header block */}
+                  <button
+                    type="button"
+                    id="modal-share-faq-btn"
+                    data-testid="modal-share-faq-btn"
+                    onClick={handleShareCurrentFaqView}
+                    className={`relative px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md cursor-pointer active:scale-98 border ${
+                      modalShareCopied
+                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-emerald-600/30 ring-2 ring-emerald-300'
+                        : 'bg-[#0A192F] hover:bg-[#172A45] text-white border-transparent hover:shadow-cyan-900/20'
+                    }`}
+                    title="Buka dialog share bawaan sistem (OS) dengan deep link ke tampilan FAQ saat ini"
+                    aria-label="Share current FAQ view"
+                  >
+                    {modalShareCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-white animate-in zoom-in-75 duration-200" />
+                        <span>Tersalin!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-3.5 h-3.5 text-[#00C2CB]" />
+                        <span>Share</span>
+                      </>
+                    )}
+
+                    {modalShareCopied && (
+                      <span 
+                        role="status" 
+                        aria-live="polite"
+                        className="absolute -top-8 left-1/2 -translate-x-1/2 px-2.5 py-0.5 bg-emerald-800 text-white text-[10px] font-bold rounded-lg shadow-md whitespace-nowrap animate-bounce pointer-events-none z-20 flex items-center gap-1"
+                      >
+                        <Check className="w-3 h-3 text-emerald-200" />
+                        <span>Deep link tersalin!</span>
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Share via Email Button next to existing share button */}
+                  <a
+                    href={modalEmailShareUrl}
+                    id="modal-share-email-faq-btn"
+                    data-testid="modal-share-email-faq-btn"
+                    onClick={() => playFaqClickSound()}
+                    className="px-4 py-2 rounded-xl bg-[#0A192F] hover:bg-[#172A45] text-white text-xs font-bold flex items-center gap-2 transition-all shadow-md cursor-pointer hover:shadow-cyan-900/20 active:scale-98"
+                    title="Bagikan ringkasan dokumen FAQ via Email (mailto:)"
+                    aria-label="Share via Email"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-[#00C2CB]" />
+                    <span>Share via Email</span>
+                  </a>
+
+                  {/* Expand All / Collapse All Button inside action bar of #faq-printable-area */}
+                  <button
+                    type="button"
+                    id="modal-expand-collapse-all-btn"
+                    data-testid="modal-expand-collapse-all-btn"
+                    onClick={handleToggleExpandAll}
+                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-[#0A192F] text-xs font-bold flex items-center gap-1.5 transition-all border border-slate-300 shadow-2xs cursor-pointer hover:border-[#00C2CB] active:scale-98"
+                    title="Expand All / Collapse All: Buka atau tutup seluruh jawaban FAQ sekaligus"
+                    aria-label="Expand All / Collapse All"
+                  >
+                    {displayedFaqs.some(f => (f.a.length > 180 || f.a.split('\n').length > 2) && expandedAnswerIds[String(f.id || f.q)]) ? (
+                      <>
+                        <ChevronUp className="w-3.5 h-3.5 text-[#00C2CB]" />
+                        <span>Collapse All</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-3.5 h-3.5 text-[#00C2CB]" />
+                        <span>Expand All</span>
+                      </>
+                    )}
                   </button>
                 </div>
 
@@ -1297,6 +1491,11 @@ export default function PrintFaqModal({
                     <div className="font-bold text-slate-800 text-[11px] leading-snug truncate" title={activeCategory}>
                       {activeCategory} ({displayedFaqs.length} FAQ)
                     </div>
+                    {activeSubCategory && activeSubCategory !== 'Semua' && (
+                      <div className="text-[10px] text-cyan-800 print:text-black font-bold flex items-center gap-1">
+                        <span>Layanan: {activeSubCategory}</span>
+                      </div>
+                    )}
                     <div className="text-[9.5px] text-sky-800 font-semibold print:text-black flex items-center gap-1 mt-0.5">
                       <BookOpen className="w-2.5 h-2.5 text-sky-600 print:text-black shrink-0" />
                       <span>Est. Waktu Baca: ~{readingTimeStats.minutes} mnt ({readingTimeStats.totalWords} kata)</span>
@@ -1545,6 +1744,13 @@ export default function PrintFaqModal({
                     <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 print:bg-black print:text-white">
                       100% AMAN & LEGAL
                     </span>
+                    <span 
+                      id="faq-print-compliance-guarantee-badge"
+                      className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 print:border print:border-black flex items-center gap-1"
+                    >
+                      <Award className="w-2.5 h-2.5 text-slate-950" />
+                      <span>100% Satisfaction Guarantee</span>
+                    </span>
                   </div>
                   <h3 className="font-extrabold text-sm text-white print:text-black leading-snug">
                     Pemberitahuan Kepatuhan Hukum & Baku Mutu Pembuangan Limbah
@@ -1552,11 +1758,21 @@ export default function PrintFaqModal({
                   <p className="text-[11px] text-slate-200 print:text-slate-800 mt-1 leading-relaxed">
                     Seluruh armada dan teknisi PT Kusuma Gemilang Raya beroperasi di bawah kepatuhan ketat <strong>Peraturan Daerah (Perda) Kota & Kabupaten Bekasi</strong> mengenai pengelolaan air limbah domestik dan industri non-B3. Pembuangan limbah disalurkan secara tertib ke instalasi pengolahan resmi <strong>IPLT Sumur Batu</strong> dan diverifikasi dengan dokumen Berita Acara & Manifest sah untuk audit ISO/lingkungan klien komersial.
                   </p>
+                  
+                  {/* Guarantee Satisfaction Note */}
+                  <div className="mt-2 p-2 rounded-xl bg-white/5 print:bg-slate-50 border border-amber-400/40 print:border-slate-300 flex items-center gap-2">
+                    <Award className="w-4 h-4 text-amber-400 print:text-slate-900 shrink-0" />
+                    <p className="text-[10px] text-slate-200 print:text-slate-800">
+                      <strong>Garansi Kepuasan 100% (Money-Back Guarantee):</strong> Pelanggan hanya membayar setelah pekerjaan dikonfirmasi tuntas dan saluran selesai diperbaiki.
+                    </p>
+                  </div>
+
                   <div className="mt-2 pt-1.5 border-t border-slate-700 print:border-slate-300 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-300 print:text-slate-900 font-semibold">
                     <span>✓ Kepatuhan Perda Lingkungan Hidup</span>
                     <span>✓ Pembuangan Resmi IPLT Sumur Batu</span>
                     <span>✓ Manifest Limbah Siap Audit</span>
                     <span>✓ NIB KBLI 37011 Berizin Resmi</span>
+                    <span>✓ Bayar Hanya Setelah Pekerjaan Tuntas</span>
                   </div>
                 </div>
               </div>
@@ -1913,6 +2129,11 @@ export default function PrintFaqModal({
                                   Tarif Resmi
                                 </span>
                               )}
+                              {faq.subCategory && (
+                                <span className="text-[10px] font-bold text-cyan-800 bg-cyan-50 px-1.5 py-0.5 rounded border border-cyan-200 print:border-slate-400 print:text-black print:bg-white">
+                                  {faq.subCategory}
+                                </span>
+                              )}
                             </div>
                             <h4 className="font-bold text-sm text-[#0A192F] leading-snug">
                               {highlightMatches(faq.q, effectiveSearchQuery)}
@@ -2163,6 +2384,12 @@ export default function PrintFaqModal({
                             </div>
                           );
                         })()}
+
+                        {/* Customer Feedback Voting: Helpful / Not Helpful */}
+                        <FaqFeedbackVoting
+                          faqId={faq.id || String(index + 1)}
+                          faqQuestion={faq.q}
+                        />
                       </div>
                     </div>
                   </motion.div>

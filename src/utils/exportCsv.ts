@@ -20,6 +20,7 @@ export function exportFaqsToCsv(
   faqs: FaqItem[], 
   options?: {
     activeCategory?: string;
+    activeSubCategory?: string;
     searchQuery?: string;
   }
 ) {
@@ -30,7 +31,10 @@ export function exportFaqsToCsv(
   const categoryName = options?.activeCategory && options.activeCategory !== 'Semua' 
     ? options.activeCategory 
     : 'Semua_Kategori';
-  const cleanCategorySlug = categoryName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+  const subCategoryName = options?.activeSubCategory && options.activeSubCategory !== 'Semua'
+    ? `_${options.activeSubCategory}`
+    : '';
+  const cleanCategorySlug = (categoryName + subCategoryName).toLowerCase().replace(/[^a-z0-9]+/g, '_');
   const now = new Date();
   const dateStamp = now.toISOString().split('T')[0];
   const timeStamp = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
@@ -41,6 +45,7 @@ export function exportFaqsToCsv(
     'No',
     'ID Dokumen',
     'Kategori',
+    'Sub-Kategori Layanan',
     'Pertanyaan (Question)',
     'Jawaban Resmi (Official Answer)',
     'Tipe Sorotan',
@@ -60,6 +65,7 @@ export function exportFaqsToCsv(
       String(index + 1),
       docId,
       faq.category || 'Umum',
+      faq.subCategory || 'Semua Layanan',
       faq.q,
       faq.a,
       faq.highlightType || 'Standar',

@@ -208,9 +208,18 @@ export interface FaqItem {
   a: string;
   iconName?: string;
   category?: string;
+  subCategory?: string;
   badge?: 'Verified' | 'Official';
   highlightType?: 'pricing' | 'guarantee' | 'safety' | 'location' | 'service' | 'maintenance';
 }
+
+export const FAQ_SUB_CATEGORIES = [
+  { id: 'all', name: 'Semua Layanan', value: 'Semua', desc: 'Seluruh Layanan Sanitasi' },
+  { id: 'septic-tank', name: 'Septic Tank Cleaning', value: 'Septic Tank Cleaning', desc: 'Sedot WC & Kuras Tangki' },
+  { id: 'drain-unclogging', name: 'Drain Unclogging', value: 'Drain Unclogging', desc: 'Pelancaran Pipa & Saluran Mampet' },
+  { id: 'stp-industrial', name: 'STP & Industrial Waste', value: 'STP & Industrial Waste', desc: 'Limbah Industri & Manifest IPLT' },
+  { id: 'general-sanitation', name: 'General Sanitation', value: 'General Sanitation', desc: 'SOP, Area & Operasional 24 Jam' }
+] as const;
 
 export const FAQS: FaqItem[] = [
   {
@@ -219,6 +228,7 @@ export const FAQS: FaqItem[] = [
     a: 'Harga layanan kami sangat transparan dihitung per kubik (m³): Limbah Black Water (Tinja) Rp 700.000/kubik (non manifest) & Rp 1.100.000/kubik (manifest), Limbah Grey Water (Lumpur & Lemak) Rp 1.100.000/kubik (non manifest) & Rp 1.500.000/kubik (manifest), serta Cleaning / Blower Lumpur Rp 1.100.000/kubik (non manifest) & Rp 1.500.000/kubik (manifest). Seluruh opsi manifest disertai dokumen resmi IPLT DLH. Anda dapat langsung menggunakan Kalkulator Estimasi Biaya & Booking Cepat di atas untuk menghitung total biaya secara instan.',
     iconName: 'BadgeDollarSign',
     category: 'Harga & Biaya',
+    subCategory: 'Septic Tank Cleaning',
     badge: 'Official',
     highlightType: 'pricing'
   },
@@ -228,6 +238,7 @@ export const FAQS: FaqItem[] = [
     a: 'Ya, seluruh pekerjaan oleh teknisi PT Kusuma Gemilang Raya bergaransi resmi. Kami memberikan jaminan kepuasan pengerjaan tuntas dan rapi. Apabila dalam masa garansi saluran mengalami kendala yang bersumber dari pengerjaan sebelumnya, tim kami siap datang kembali untuk melakukan penanganan ulang tanpa biaya tambahan.',
     iconName: 'Award',
     category: 'Jaminan Garansi',
+    subCategory: 'Septic Tank Cleaning',
     badge: 'Official',
     highlightType: 'guarantee'
   },
@@ -237,6 +248,7 @@ export const FAQS: FaqItem[] = [
     a: 'Untuk mencegah septic tank cepat penuh dan saluran kloset tersumbat: (1) Jangan pernah membuang sampah non-biodegradable seperti tisu basah, pembalut, kantong plastik, puntung rokok, atau dental floss ke dalam kloset. (2) Hindari penggunaan sabun atau deterjen kimia keras pembersih kloset berdosis tinggi (karbol keras/cairan pemutih klorin berlebih) yang mematikan koloni bakteri pengurai anaerob alami di dalam tangki. (3) Siram dengan kuantitas air yang cukup setiap kali pemakaian. (4) Lakukan sedot kuras dan inspeksi rutin terjadwal setiap 1 hingga 2 tahun sekali sebelum terjadi sedimentasi lumpur padat (sludge) di dasar septic tank.',
     iconName: 'Sparkles',
     category: 'Tips Perawatan',
+    subCategory: 'Septic Tank Cleaning',
     badge: 'Verified',
     highlightType: 'maintenance'
   },
@@ -246,6 +258,7 @@ export const FAQS: FaqItem[] = [
     a: 'Minyak jelantah dan lemak dapur (FOG - Fats, Oils, and Grease) akan membeku dan mengeras di dinding pipa saluran bawah tanah membentuk gumpalan padat seperti semen kapur (fatberg). Gumpalan ini merupakan pemicu nomor satu saluran pipa buntu total. Di dalam septic tank, minyak dan lemak akan mengapung menjadi lapisan kerak kedap udara (scum layer) yang mematikan sirkulasi oksigen bakteri pengurai, sehingga tangki cepat penuh dan mengeluarkan aroma busuk menyengat.',
     iconName: 'Droplet',
     category: 'Tips Perawatan',
+    subCategory: 'Drain Unclogging',
     badge: 'Official',
     highlightType: 'maintenance'
   },
@@ -255,6 +268,7 @@ export const FAQS: FaqItem[] = [
     a: 'Berdasarkan standar sanitasi Kementerian PUPR dan Dinas Kesehatan RI, septic tank hunian rumah tinggal keluarga (4-6 orang) idealnya disedot rutin setiap 1 hingga 2 tahun sekali. Pengurasan teratur mencegah akumulasi lumpur tinja mengendap menjadi kerak pekat yang dapat menyumbat pori-pori bidang resapan tanah. Jika pori-pori resapan tersumbat lumpur padat, biaya pembuatan sumur resapan baru jauh lebih mahal dibandingkan biaya sedot rutin.',
     iconName: 'Clock',
     category: 'Tips Perawatan',
+    subCategory: 'Septic Tank Cleaning',
     badge: 'Official',
     highlightType: 'maintenance'
   },
@@ -264,6 +278,7 @@ export const FAQS: FaqItem[] = [
     a: 'Waspadai 4 gejala awal berikut: (1) Air siraman kloset turun lambat disertai suara tegukan/gelembung udara (gurgling sound). (2) Tercium bau gas metana atau aroma septic tank yang menusuk hidung di area kloset maupun pekarangan sekitar tangki. (3) Air kloset meluap atau menyembur balik ketika disiram, terutama saat musim hujan lebat. (4) Rumput atau tanah di atas area resapan septic tank tampak becek atau lembek tak wajar akibat resapan yang jenuh. Bila salah satu gejala muncul, segera hubungi PT Kusuma Gemilang Raya untuk penanganan preventif sebelum meluap total.',
     iconName: 'ShieldCheck',
     category: 'Tips Perawatan',
+    subCategory: 'Septic Tank Cleaning',
     badge: 'Verified',
     highlightType: 'maintenance'
   },
@@ -273,6 +288,7 @@ export const FAQS: FaqItem[] = [
     a: 'Serbuk bakteri pengurai (bio-starter) sangat bermanfaat sebagai suplemen perawatan berkala untuk mempercepat proses fermentasi limbah organik menjadi cairan dan gas buang ramah lingkungan. Namun, probiotik tidak dapat mengurai benda padat anorganik (plastik, pembalut, pasir) maupun lumpur tinja keras yang sudah mengendap bertahun-tahun. Oleh karena itu, pengurasan mekanis dengan truk vakum bertenaga tinggi secara rutin tetap merupakan metode terbaik dan wajib untuk meremajakan kapasitas tangki.',
     iconName: 'Wrench',
     category: 'Tips Perawatan',
+    subCategory: 'Septic Tank Cleaning',
     badge: 'Verified',
     highlightType: 'maintenance'
   },
@@ -282,6 +298,7 @@ export const FAQS: FaqItem[] = [
     a: 'Ya, kami melayani seluruh wilayah Kota Bekasi dan Kabupaten Bekasi dengan armada yang siap standby setiap saat.',
     iconName: 'MapPin',
     category: 'Cakupan Wilayah',
+    subCategory: 'General Sanitation',
     highlightType: 'location'
   },
   {
@@ -290,6 +307,7 @@ export const FAQS: FaqItem[] = [
     a: 'Sangat bisa. Cikarang (Cikarang Pusat, Utara, Selatan, Barat, Timur) dan seluruh kecamatan di Kabupaten Bekasi merupakan area layanan utama kami.',
     iconName: 'Truck',
     category: 'Area Khusus Cikarang',
+    subCategory: 'General Sanitation',
     highlightType: 'location'
   },
   {
@@ -298,6 +316,7 @@ export const FAQS: FaqItem[] = [
     a: 'Bisa, pengurasan septic tank untuk rumah tinggal, perkantoran, ruko, restoran, dan fasilitas umum adalah spesialisasi layanan kami.',
     iconName: 'Droplet',
     category: 'Layanan Tangki',
+    subCategory: 'Septic Tank Cleaning',
     highlightType: 'service'
   },
   {
@@ -306,6 +325,7 @@ export const FAQS: FaqItem[] = [
     a: 'Ya, kami memiliki teknisi ahli khusus untuk menangani saluran air, toilet, wastafel, pipa got, dan floor drain yang tersumbat tanpa perlu bongkar keramik.',
     iconName: 'Wrench',
     category: 'Saluran & Pipa',
+    subCategory: 'Drain Unclogging',
     highlightType: 'service'
   },
   {
@@ -314,6 +334,7 @@ export const FAQS: FaqItem[] = [
     a: 'Layanan kami tersedia 24 jam setiap hari, termasuk hari libur dan akhir pekan. Untuk kunjungan malam/dini hari darurat, tim kami selalu siap siaga.',
     iconName: 'Clock',
     category: 'Operasional 24 Jam',
+    subCategory: 'General Sanitation',
     highlightType: 'service'
   },
   {
@@ -322,6 +343,7 @@ export const FAQS: FaqItem[] = [
     a: 'Tentu, kami melayani mulai dari skala rumah tangga kecil, perkantoran swasta/pemerintah, ruko, hingga kebutuhan pabrik dan industri besar di kawasan Bekasi.',
     iconName: 'Building2',
     category: 'Sektor Klien',
+    subCategory: 'STP & Industrial Waste',
     highlightType: 'service'
   },
   {
@@ -330,6 +352,7 @@ export const FAQS: FaqItem[] = [
     a: 'Setiap teknisi PT Kusuma Gemilang Raya menerapkan SOP keselamatan dan higienitas ketat: (1) Standar APD Lengkap: Teknisi wajib mengenakan sepatu boots safety anti-slip, sarung tangan karet industri tebal, masker respirator/penyaring gas metana, dan seragam kerja resmi. (2) Prosedur Teknis Lapangan Aman: Pengerjaan menggunakan selang vakum spiral kedap udara dan pompa vakum bertenaga tinggi tanpa merusak instalasi pipa atau merusak lantai keramik. (3) Protokol Kebersihan Purna-Kerja: Selesai pengerjaan, tim kami membilas dan membersihkan seluruh area sekitar saluran, melakukan penyemprotan desinfektan antibakteri penghilang bau, dan merapatkan kembali penutup septic tank dengan rapi sehingga hunian atau lokasi usaha Anda tetap steril dan bersih maksimal.',
     iconName: 'ShieldCheck',
     category: 'SOP Keamanan & Garansi',
+    subCategory: 'General Sanitation',
     badge: 'Verified',
     highlightType: 'safety'
   },
@@ -339,6 +362,7 @@ export const FAQS: FaqItem[] = [
     a: 'Dokumen Manifest IPLT adalah bukti fisik dan legalitas sah dari UPTD Pengelolaan Air Limbah Domestik (IPLT Sumur Batu DLH Bekasi) yang menerangkan bahwa limbah lumpur tinja atau STP telah diterima dan diolah di fasilitas resmi pemerintah. Dokumen ini wajib dimiliki pabrik, gedung kantor, hotel, dan restoran untuk memenuhi persyaratan audit lingkungan hidup (ISO 14001, PROPER, AMDAL, UKL-UPL) serta menghindarkan perusahaan dari sanksi pembuangan limbah ilegal ke lingkungan bebas.',
     iconName: 'FileCheck',
     category: 'Legalitas & Manifest IPLT',
+    subCategory: 'STP & Industrial Waste',
     badge: 'Official',
     highlightType: 'guarantee'
   }
